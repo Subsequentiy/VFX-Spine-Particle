@@ -12989,6 +12989,14 @@ window.addEventListener('unhandledrejection', function (event) {
     ctx.restore();
   }
 
+  /* 发射器形状的描边颜色（2026-11-11 用户要求改成红色实线）。
+     原来是紫色虚线 rgba(167,139,250,.85) + setLineDash([5,4])：虚线在深色
+     画布上跟网格线、粒子边缘混在一起，发射范围的边界读不准；红色实线一眼
+     就能和粒子本身分开，也不会和网格的紫灰同色。
+     画布本身挂着 filter: brightness(var(--ui-brightness-inv)) 做亮度补偿，
+     所以这里的颜色写什么，屏幕上看到的就是什么。 */
+  var EMITTER_GIZMO_COLOR = 'rgba(255, 82, 82, .95)';
+
   function drawEmitterGizmo(ctx, s, cx, cy, zoom) {
     var e = s.emitter;
     if (!e.show) return;
@@ -13002,10 +13010,11 @@ window.addEventListener('unhandledrejection', function (event) {
        类型都生效，于是「锥形旋转」不为 0 时矩形的虚线外框（以及点的十字、
        圆的环）会跟着一起转 —— 用户报的「锥形的锥形旋转会对矩形造成影响」
        就是它。粒子本身只有锥形那一支读 rotation，框跟着转反而对不上。 */
-    ctx.strokeStyle = 'rgba(167, 139, 250, .85)';
-    ctx.fillStyle = 'rgba(167, 139, 250, .85)';
-    ctx.lineWidth = 1.2;
-    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = EMITTER_GIZMO_COLOR;
+    ctx.fillStyle = EMITTER_GIZMO_COLOR;
+    ctx.lineWidth = 1.5;
+    /* 实线：四段虚线在半径很小的时候只剩一两个点，看不出画的是什么形状。 */
+    ctx.setLineDash([]);
     if (e.type === 'circle') {
       var r = Math.max(0, Number(e.radius) || 0) * k;
       ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
@@ -15084,8 +15093,15 @@ window.addEventListener('unhandledrejection', function (event) {
       fNum('锥形旋转', 'emitter.rotation', { step: 1, when: 'emitter.type=cone' }) +
       fCheck('显示发射器形状', 'emitter.show', 'emitter.type=cone') +
       fCheck('首尾循环', 'emission.seamless', 'emission.mode=stream') +
-      fCheck('生成衔接动画', 'emission.intro', 'emission.mode=stream', 'emission.seamless=true') +
-      fCheck('生成结束衔接动画', 'emission.outro', 'emission.mode=stream', 'emission.seamless=true');
+      /* 这两个开关原来还带一个 offWhen=`emission.seamless=true`（没开首尾循环
+         就整行置灰、控件 disabled）。用户报的「开启后不会生效」就是它：点下去
+         既没有反应、也没有任何说明，勾选状态还一直是关的。
+         现在不再置灰 —— 点它就顺手把「首尾循环」一起打开（规则见
+         enforceEmissionRules），和「切到持续就自动开首尾循环」是同一个思路：
+         这两个动画本来就只能挂在首尾循环上，用户表达了意图就替他补上前置条件，
+         而不是让他先去上面开一个开关、再回来点一次。 */
+      fCheck('生成衔接动画', 'emission.intro', 'emission.mode=stream') +
+      fCheck('生成结束衔接动画', 'emission.outro', 'emission.mode=stream');
 
     var base =
       /* 外观与资源并进「基础属性」：贴图和混合模式只影响粒子画出来长什么样，
@@ -15374,6 +15390,14 @@ window.addEventListener('unhandledrejection', function (event) {
   function enforceEmissionRules(path) {
     var s = sys();
     if (path === 'emission.mode' && s.emission.mode === 'stream') s.emission.seamless = true;
+    /* 打开任一个衔接动画就把「首尾循环」补上（2026-11-11）：这两个动画只能挂在
+       首尾循环上，界面上原来是把整行置灰 —— 用户点了没反应，于是报「开启后
+       不会生效」。这条规则让界面、API、预设三条路一致：只要意图成立，前置条件
+       由这里补齐。 */
+    if ((path === 'emission.intro' || path === 'emission.outro') &&
+        (s.emission.intro || s.emission.outro)) {
+      s.emission.seamless = true;
+    }
     if (path === 'emission.seamless' && !s.emission.seamless) {
       s.emission.intro = false;
       s.emission.outro = false;
@@ -15502,6 +15526,9 @@ window.addEventListener('unhandledrejection', function (event) {
       refreshTransport();
     }
     if (path === 'emission.seamless' || path === 'emission.intro' || path === 'emission.outro') {
+      /* 首尾循环也要刷：打开衔接动画时 enforceEmissionRules 会把它补成 true，
+         界面上那颗开关得跟着亮起来，用户才知道前置条件已经自动满足了。 */
+      syncPath('emission.seamless');
       syncPath('emission.intro');
       syncPath('emission.outro');
     }
@@ -16685,7 +16712,32 @@ window.addEventListener('unhandledrejection', function (event) {
      不多一帧不少，只是同一段选了个更省的写法。60 组随机场景实测：关键帧数逐
      场景完全相同，导出字节 819457 -> 784231（-4.3 %），贝塞尔段 2353 -> 1840，
      逐帧真值最大误差 0.4618 -> 0.4618 不变。 */
+  /* 这一段里所有采样是不是都没动（常量段）。
+     只看两个端点不够：颜色从 ff 掉到 80 再回到 ff，端点相同但形状完全不是
+     常量，那样压成一条直线就把中间的凹陷丢了。所以要逐点核。
+     判定用这条轨道自己的容差，和直线拟合用的是同一把尺子。 */
+  function spineSpanFlat(dense, ia, ib, prop, tol) {
+    for (var c = 0; c < tol.length; c++) {
+      var a = dense[ia][prop][c];
+      for (var i = ia + 1; i <= ib; i++) {
+        if (Math.abs(dense[i][prop][c] - a) > tol[c]) return false;
+      }
+    }
+    return true;
+  }
+
   function spineSpan(dense, ia, ib, prop, tol, shared, mode) {
+    /* 常量段直接收下（2026-11-11 修复）。
+       生命曲线的「平顶」—— 透明度连着几十帧都是同一个值 —— 属于这种段：
+       两个端点相同、中间也不动，直线就是精确解，本来一个跨度就能合完。
+       可 bezier 模式原来会径直去解贝塞尔手柄：这一段里每个通道的净变化都是 0，
+       喂给最小二乘的采样点是空的，det = 0，spineSolveHandles 直接返回 null，
+       于是整段被判「拟合失败」，贪心只能退到相邻两帧 —— 一长串完全相同的值
+       就被切成了逐帧关键帧。
+       用户拿导出的 json 问「透明度有好多一样的帧这些帧是不是可以没必要」：
+       实测那张 json 里 20 条颜色轨道共 414 个关键帧，其中 303 个（73.2 %）
+       就是这种平顶上的重复帧。现在先判常量，判掉就不进解方程的岔路。 */
+    if (spineSpanFlat(dense, ia, ib, prop, tol)) return { ok: true, seg: null };
     /* 用户把这条曲线设成「线性」：只认直线，装不下就靠加密关键帧去贴，
        绝不写 curve 字段（2026-11-04 第三十九轮）。 */
     if (mode === 'linear') return { ok: spineLinearOK(dense, ia, ib, prop, tol), seg: null };
@@ -16777,6 +16829,30 @@ window.addEventListener('unhandledrejection', function (event) {
       i = goodJ;
     }
     keys.push({ time: dense[n - 1].time, v: dense[n - 1][prop] });
+
+    /* 平顶内部多余的帧再扫一遍（2026-11-11）。
+       上面「常量段直接收下」能消掉绝大多数重复帧，但贪心的探测是往后跳着试的：
+       一段平顶刚好在「上一个落点之后、下一个探测点之前」结束时，跨度会被
+       卡在平顶的最后一帧上，于是输出里可能留下「前后两帧同值、中间那帧也同值」
+       的孤点。逐个数出来删掉，判据只有一个：这一帧的值和前后两帧都相同，
+       而且它两侧的两段都是直线（curves 里是 null）。
+       两侧都是直线时，这三帧之间本来就是一条水平直线，删掉中间这帧形状分毫不变；
+       只要有一侧挂了贝塞尔手柄就不能删 —— 那段可能是有意的过冲，删了就变了形。 */
+    for (var ri = keys.length - 2; ri >= 1; ri--) {
+      var vPrev = keys[ri - 1].v, vCur = keys[ri].v, vNext = keys[ri + 1].v;
+      var eqAll;
+      if (same) eqAll = same(vPrev, vCur) && same(vCur, vNext);
+      else {
+        eqAll = true;
+        for (c = 0; c < tol.length; c++) {
+          if (Math.abs(vCur[c] - vPrev[c]) > flatTol[c] || Math.abs(vNext[c] - vCur[c]) > flatTol[c]) { eqAll = false; break; }
+        }
+      }
+      if (!eqAll) continue;
+      if (curves[ri - 1] || curves[ri]) continue;
+      keys.splice(ri, 1);
+      curves.splice(ri, 1);
+    }
 
     /* 末尾如果和前一帧数值相同（死亡帧只改了缩放 / 透明度，位移没动），
        留着也没意义，去掉后这一路轨道少一帧。 */
