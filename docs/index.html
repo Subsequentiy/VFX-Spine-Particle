@@ -1893,53 +1893,22 @@ body.particle-active .sidebar { display: none !important; }
 #pt-export-group .pt-export-row { grid-template-columns: 82px minmax(0, 1fr) 18px; }
 #pt-export-group .pt-export-row > .pt-inline { width: 100%; margin-right: 0; }
 #pt-export-group .pt-select { width: 100%; }
-/* 动画名称是文字框：数字框那套「78px 宽 + 右对齐 + 等宽字体」不适合它。
-   选择器要带上 #pt-export-group —— `.pt-num` 那几条写在后面，光写
-   `.pt-name-input` 特异性打平、会被它按定义顺序盖掉（宽度又缩回 78px）。 */
-#pt-export-group .pt-name-input {
-  width: 100%; min-width: 0;
-  text-align: left; font-family: inherit;
-}
 /* 整行一颗按钮：宽度跟着上面几行输入框走 */
 .pt-export-spine { width: 100%; height: 27px; }
 
-/* 「将导出的动画」预览（2026-11-12 用户要求）。
-   三段的分工是固定的，所以这里不写成自由列表，而是按顺序排一排标签：
-   出生 → 循环 → 死亡，序号标在上面，一眼看得出是几段、各叫什么。
-   标签用等宽字体显示真实的动画名（name_intro / name_outro 那种），
-   因为用户要的是「导出后 Spine 里能看到什么」，不是给人看的说明。 */
-.pt-anim-preview { gap: 5px; }
-.pt-anim-preview-head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 8px; margin-bottom: 1px;
-}
+/* 「动画」这一行（2026-11-12 用户要求）。
+   它取代了原来的「动画名称」输入框：骨架里的动画名现在固定是 born / idle / die
+   三段，不用再起名，所以这一格换成下拉 —— 选哪一段，画布上就播哪一段。
+   行布局沿用 pt-export-row（82px 标签 + 中间一格 + 18px 空列），
+   和上面的「Spine 版本」完全对齐。 */
+#pt-export-group .pt-anim-row > .pt-inline { gap: 6px; }
+/* 下拉吃掉剩下的宽度，右边的「N 个」按内容宽，不再撑满整格 */
+#pt-export-group .pt-anim-row .pt-select { flex: 1 1 auto; width: auto; min-width: 0; }
 .pt-anim-count {
-  font: 9.5px var(--mono); color: var(--accent);
   flex: none; white-space: nowrap;
+  font: 9.5px var(--mono); color: var(--accent);
 }
-.pt-anim-chips { display: flex; flex-direction: column; gap: 3px; }
-.pt-anim-chip {
-  display: flex; align-items: center; gap: 6px;
-  padding: 3px 6px; border-radius: 4px;
-  background: #0c0e13; border: 1px solid var(--line-soft);
-  font-size: 10px; line-height: 1.35; min-width: 0;
-}
-.pt-anim-chip.is-main { border-color: rgba(139, 92, 246, .38); background: rgba(139, 92, 246, .1); }
-.pt-anim-role {
-  flex: none; width: 26px; font-size: 9px; color: var(--muted);
-  letter-spacing: .02em;
-}
-.pt-anim-chip.is-main .pt-anim-role { color: #c3b0ff; }
-.pt-anim-name {
-  flex: 1; min-width: 0; font: 10px var(--mono); color: #e6e0f1;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.pt-anim-chip.is-off .pt-anim-name { color: #5b5f69; }
-.pt-anim-len { flex: none; font: 9px var(--mono); color: var(--dim); }
-.pt-anim-chip.is-off .pt-anim-len { color: #494c55; }
-.pt-anim-hint {
-  font-size: 9px; line-height: 1.5; color: #6e7280; margin-top: 1px;
-}
+.pt-anim-hint { font-size: 9px; line-height: 1.5; color: #6e7280; }
 
 /* ---- body columns ---- */
 /* 左栏整列删掉（「对象属性」并进右栏），画布吃下让出来的宽度，
@@ -3060,24 +3029,20 @@ body.particle-active .sidebar { display: none !important; }
               </select>
             </span>
           </div>
-          <div class="pt-field pt-export-row">
-            <span class="pt-label">动画名称</span>
+          <!-- 「动画」（2026-11-12 用户要求）：这一行取代了原来的「动画名称」输入框
+               （那一行已删）—— 骨架里的动画名现在是固定的三段：born（出生）/
+               idle（循环）/ die（死亡），不需要用户再起名。下拉里列出当前这个
+               粒子系统实际会导出的那几段，选哪一段，画布上就播哪一段，
+               出生和死亡衔接动画因此也能在编辑器里直接看。 -->
+          <div class="pt-field pt-export-row pt-anim-row">
+            <span class="pt-label">动画</span>
             <span class="pt-inline">
-              <input class="pt-num pt-name-input" type="text" id="pt-anim-name" value="idle"
-                maxlength="48" spellcheck="false" aria-label="动画名称"
-                title="导出到 Spine 里的动画名字；两个衔接动画自动叫「名称_intro」「名称_outro」。留空则用 idle">
+              <select class="pt-select" id="pt-anim-select" aria-label="动画"
+                title="选择要预览的动画：出生（born）→ 循环（idle）→ 死亡（die），依次播就是粒子完整的一生"></select>
+              <span class="pt-anim-count" id="pt-anim-count">1 个</span>
             </span>
           </div>
-          <!-- 将导出的动画（2026-11-12 用户要求：在 Spine 版本下面显示
-               「当前粒子系统的动画和有几个动画」）。三段的分工是固定的：
-               出生（从无到有）→ 循环（有了以后一圈一圈）→ 死亡（从有到无），
-               依次播就是一条完整的生命线。内容由 refreshAnimPreview() 填。 -->
           <div class="pt-field full pt-anim-preview">
-            <div class="pt-anim-preview-head">
-              <span class="pt-label">将导出的动画</span>
-              <span class="pt-anim-count" id="pt-anim-count">1 个</span>
-            </div>
-            <div class="pt-anim-chips" id="pt-anim-chips"></div>
             <div class="pt-anim-hint" id="pt-anim-hint" hidden></div>
           </div>
           <div class="pt-field full">
@@ -11826,6 +11791,107 @@ window.addEventListener('unhandledrejection', function (event) {
   var TICK_FAIL_LIMIT = 3;
   var statusTimer = 0;
 
+  /* ------------------------------------------------------------------ */
+  /* 预览的「当前动画」                                                  */
+  /* ------------------------------------------------------------------ */
+  /* 2026-11-12 用户要求：出生 / 死亡衔接动画在编辑器里也要能播。
+     它们是导出的副产物（要从空场重跑一个周期、或者停掉发射等粒子死光），
+     不是时间轴上的普通时刻，所以不能靠拖播放头看到 —— 只能单独进入一种
+     「预览某个导出动画」的模式，由下面这套状态驱动。
+     三种模式分别是：
+         ''      正常 -- 播时间轴，和以前完全一样
+         'born'  出生 -- 从空场发射一整个周期（透明淡入）
+         'die'   死亡 -- 从稳态停掉发射，等粒子死光（透明淡出）
+      名字用 born / idle / die 三个短词，也是导出到 Spine 里的动画名。 */
+  var previewAnim = '';
+  var PREVIEW_ANIMS = ['born', 'idle', 'die'];
+  /* 每个系统「死亡」预览段的实际长度（秒）。primeDieSim 预热完顺手记下来，
+     previewDuration 读它 —— 这样时间条的长度和导出的结束衔接动画一致，
+     而不是按最长生命估一个偏长的值。 */
+  var dieLeft = [];
+
+  /* 某个预览模式的时长：出生和循环都是循环周期，死亡是「最年轻那颗还有多久」。
+     死亡的精确长度是预热到稳态那一刻、现存粒子里最年轻的那颗的剩余寿命，
+     预热完就能直接读出来（见 primeDieSim 里的 dieLeft），不用另外烘焙。
+     没预热过时退回最长生命当上界。 */
+  function previewDuration(name) {
+    var s = sys();
+    if (!name || name === 'idle') return naturalDuration(s);
+    if (name === 'born') return loopPeriod(s);
+    var left = dieLeft[current];
+    if (left > 1e-4) return Math.max(TIMELINE_MIN, Math.min(timelineCap(), left));
+    return Math.max(TIMELINE_MIN, Math.min(timelineCap(), maxLife(s)));
+  }
+
+  /* 单个系统的起点选择 + 推进。预览出生 / 死亡衔接动画时，起点和正常时间轴
+     不一样（出生从真正的空场起步，死亡从稳态停掉发射往下走），
+     stepAllTo / restepCurrent / tick 都走这里，三处的轨迹才不会分叉。 */
+  function stepOne(i, target) {
+    var tgt = stepGrid(target);
+    focusSim(i);
+    var name = (i === current) ? previewAnim : '';
+    /* 要重新从起点算：新建的 sim、被标脏的、或者播放头往回退了。
+       判据里必须带上 rng —— 新建的 sim.rng 是 null，直接 advanceTo 会在
+       第一次发射时炸「rng is not a function」（resetSim 里才会 seedRng）。 */
+    var back = sim.rng == null || sim.dirty || sim.t > tgt + 1e-9;
+    if (name === 'born') {
+      /* 出生：从真正的空场起步，不预热。 */
+      if (back || sim.dieMode) { resetSim(true); sim.dieMode = false; sim.dirty = false; }
+    } else if (name === 'die') {
+      /* 死亡：先预热到稳态再关掉发射，这一步只做一次，之后逐帧往下推。 */
+      if (back || !sim.dieMode) { primeDieSim(); sim.dirty = false; }
+    } else {
+      if (back || sim.dieMode) { resetSim(); sim.dieMode = false; sim.dirty = false; }
+    }
+    advanceTo(tgt);
+    unfocusSim();
+  }
+
+  /* 把画布上所有系统推到 target 秒（时间轴只有一条，共用同一个播放头）。 */
+  function stepAllTo(target) {
+    for (var i = 0; i < systems.length; i++) stepOne(i, target);
+  }
+
+  /* 进入「死亡」预览的起点：预热一个周期拿到稳态，然后把发射关掉。
+     和 buildOneSystem 烘焙结束衔接动画时的 preRoll + mute 完全一致。
+     顺手记下「死亡段实际有多长」：预热完场上最年轻的那颗粒子还剩多久，
+     就是粒子全部死光的时刻 —— 导出的结束衔接动画也正好是这个长度。
+     （以前按最长生命估，实测会多出 0.2 秒的空尾巴，播放头时长和导出的对不上。） */
+  function primeDieSim() {
+    resetSim();
+    sim.mute = true;
+    sim.dieMode = true;
+    var left = 0;
+    for (var k = 0; k < sim.particles.length; k++) {
+      var p = sim.particles[k];
+      var rem = (Number(p.life) || 0) - (Number(p.age) || 0);
+      if (rem > left) left = rem;
+    }
+    /* 向上对齐到整帧：导出的关键帧落在整帧上，最后一个关键帧是「发现粒子
+       已经死了」的那帧，所以导出的长度也是整帧；不对齐的话画布会比导出
+       短零点几帧，播放头停在最后一帧时还看得见一颗半透明的粒子。 */
+    if (left > 0) left = Math.ceil(left * SPINE_FPS - 1e-9) / SPINE_FPS;
+    dieLeft[simIndex >= 0 ? simIndex : current] = left;
+  }
+
+  /* 出生 / 死亡衔接动画的全局透明度斜坡：和导出的 ramp 完全一致。
+     画布上要乘进每个粒子的 alpha，用户才看得到「从无到有 / 从有到无」。
+     正常时间轴和 idle 返回 1（不改变任何东西）。
+     只作用于当前选中的那个系统：别的系统仍然在跑各自的时间轴，
+     一起淡入淡出会让它们凭空消失又出现。 */
+  function previewRamp(idx, t) {
+    if (idx !== current) return 1;
+    if (previewAnim === 'born') {
+      var Lb = previewDuration('born');
+      return Lb > 0 ? clamp(t / Lb, 0, 1) : 1;
+    }
+    if (previewAnim === 'die') {
+      var Ld = previewDuration('die');
+      return Ld > 0 ? clamp(1 - t / Ld, 0, 1) : 1;
+    }
+    return 1;
+  }
+
   var dom = {};
   /* 贴图着色缓存。键里带颜色，而颜色在「生命期颜色」开启时随 u 连续插值，
      等于每帧每个粒子一个新键 —— 不设上限就会一路涨到内存爆掉（每项是一张
@@ -11895,6 +11961,10 @@ window.addEventListener('unhandledrejection', function (event) {
 
   function sys() { return systems[simIndex >= 0 ? simIndex : current]; }
   function duration() {
+    /* 预览出生 / 死亡衔接动画时，时间轴就是那一段的长度 ——
+       这要放在最前面：它们比主循环短或长都正常，拖播放头得按它们自己的
+       长度走，否则出生动画的淡入会被截断、死亡动画的尾巴拖不到。 */
+    if (previewAnim) return previewDuration(previewAnim);
     /* 时间轴时长不再手填，永远是算出来的：粒子全部消失的那一刻
        （首尾循环时就是循环周期）。见 naturalDuration。
        多个系统共用一条时间轴，取最长的那个，否则短的那个到了时长末尾
@@ -11995,6 +12065,15 @@ window.addEventListener('unhandledrejection', function (event) {
       emitSeq: 0,
       /* 导出「结束衔接动画」时把发射关掉，让现存的粒子自然死光。 */
       mute: false,
+      /* 「死亡」预览用的标记（2026-11-12）：这一份 sim 当前是不是处在
+         「已经预热到稳态、发射被关掉」的死亡段起点上。立着就不用重新预热，
+         逐帧往下推即可；一旦回到普通时间轴或换别的预览段就清掉。 */
+      dieMode: false,
+      /* 「下次推演必须从起点重算」（2026-11-12）。新建的 sim、以及切换预览
+         动画时都要立起来：换段之后起点完全不同（出生从空场、循环从稳态第 0 帧、
+         死亡从稳态停掉发射），可是播放头恰好停在 0 时 `sim.t > tgt` 这个判据
+         是不成立的，不额外记一个标记就会接着上一段的粒子往下跑。 */
+      dirty: true,
       /* 这一份 sim 有没有推过「零步长」的那一拍。t=0 时 advanceTo 的目标
          也是 0，while 循环一次都不进，于是第 0 帧永远看不到「0 秒发射」的
          爆发粒子 —— 而导出（bakeParticles）显式 stepSim(0) 是看得到的。
@@ -12532,15 +12611,10 @@ window.addEventListener('unhandledrejection', function (event) {
   }
 
   /* 把每个系统都推到 t 秒。时间轴只有一条，所有系统共用同一个播放头，
-     所以定位一次要把所有系统都算到位，不能只算当前选中的那个。 */
+     所以定位一次要把所有系统都算到位，不能只算当前选中的那个。
+     起点怎么给交给 stepAllTo（预览出生 / 死亡衔接动画时起点不一样）。 */
   function stepTo(t) {
-    var target = Math.max(0, t);
-    for (var i = 0; i < systems.length; i++) {
-      focusSim(i);
-      resetSim();
-      advanceTo(target);
-    }
-    unfocusSim();
+    stepAllTo(Math.max(0, t));
   }
 
   /* ------------------------------------------------------------------ */
@@ -13151,13 +13225,18 @@ window.addEventListener('unhandledrejection', function (event) {
     ctx.globalCompositeOperation = s.appearance.blend === 'normal' ? 'source-over' : 'lighter';
     var life = s.life || {};
     var parts = sim.particles;
+    /* 预览出生 / 死亡衔接动画时，整段还有一条全局透明度斜坡
+       （从无到有 / 从有到无），和导出写进颜色轨的那条完全一致。
+       正常时间轴下 previewRamp 恒为 1，画出来和以前一模一样。 */
+    var ramp = previewRamp(idx, time);
+    if (ramp <= 0.001) { unfocusSim(); return; }
     for (var i = 0; i < parts.length; i++) {
       var p = parts[i];
       var u = clamp(p.age / p.life, 0, 1);
       /* 色标自带的不透明度乘进来（2026-11-03 第二十七轮）：默认全是 1，
          所以没动过这个参数的粒子，画出来和以前一模一样。 */
       var cs = lifeColorSample(life.color, u);
-      var alpha = clamp(lifeValue(life.opacity, u), 0, 1) * cs.a;
+      var alpha = clamp(lifeValue(life.opacity, u), 0, 1) * cs.a * ramp;
       if (alpha <= 0.002) continue;
       var sf = lifeScale(life.scale, u);
       if (sf[0] <= 0.001 && sf[1] <= 0.001) continue;
@@ -15378,10 +15457,10 @@ window.addEventListener('unhandledrejection', function (event) {
   }
   function restepCurrent() {
     if (!systems.length) return;
-    focusSim(current);
-    resetSim();
-    advanceTo(stepGrid(time));
-    unfocusSim();
+    /* 参数改了，当前系统必须从起点整块重算 —— 标脏让 stepOne 走重算分支
+       （死亡段顺带会把「实际死光时刻」重新量一遍，时间条长度跟着更新）。 */
+    simOf(current).dirty = true;
+    stepOne(current, stepGrid(time));
     draw();
   }
   /* 哪些路径改了要重推演？位置和外观是画的时候才读的（worldFromLocal /
@@ -16387,12 +16466,7 @@ window.addEventListener('unhandledrejection', function (event) {
          这样 sim.t 最多比 time 超前一个 STEP，不会逐帧累积偏差。
          画布上有几个系统就要推几个：每个系统一份自己的 sim（见 sims）。 */
       var tgt = stepGrid(time);
-      for (var i = 0; i < systems.length; i++) {
-        focusSim(i);
-        if (sim.t > tgt + 1e-9) resetSim();
-        advanceTo(tgt);
-      }
-      unfocusSim();
+      stepAllTo(tgt);
 
       draw();
       refreshTransport();
@@ -16524,83 +16598,56 @@ window.addEventListener('unhandledrejection', function (event) {
     return SPINE_VERSIONS[id] || SPINE_VERSIONS['3.8'];
   }
 
-  /* 导出到 Spine 的动画名字（2026-11-03 第二十四轮，用户要求「支持修改导入
-     Spine 的动画名称」）。原来三段动画的名字写死成 animation / animation_intro /
-     animation_outro，现在主名字由「导出设置 → 动画名称」那个输入框给，两个
-     衔接动画在主名字后面加 _intro / _outro，所以这里只算主名字。
-     清洗规则：控制字符换成空格（写进 json 的键里只会让编辑器显示成方块）、
-     连续空白压成一个、首尾去掉；清洗完是空串就退回 idle —— Spine 里
-     动画名不能是空的，空键在编辑器里会直接报错。
-     2026-11-03 第二十五轮：默认名从 animation 改成 idle（用户指定），回退值
-     跟着一起改成 idle，否则「清空输入框」会跳到一个和默认值不一样的名字上。 */
-  function spineAnimName() {
-    var el = document.getElementById('pt-anim-name');
-    var raw = el && el.value != null ? String(el.value) : '';
-    var name = raw.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
-    /* 这一段属性名会被当成 dictionary 的键写进 json 的 animations 里，
-       所以必须是「安全的键」：
-       · __proto__ / constructor / prototype 是原型链上的名字。__proto__ 赋值
-         是改原型（JSON.stringify 出来 animations 变成 {}，动画整段消失，
-         状态栏却还报着关键帧数）；constructor 之类会建出能和内置属性撞车的键。
-       · hasOwnProperty / toString / valueOf / isPrototypeOf / propertyIsEnumerable /
-         toLocaleString / constructor 这些如果当名字占了键，后面 spineSlim 里那句
-         `anims.hasOwnProperty(anName)` 会直接抛 TypeError（对象上那个方法被覆盖了），
-         整次导出以「未知错误」收场。（2026-11-05 修复）
-       撞上就加下划线前缀，而不是退回 idle —— 用户能看出名字被动过。 */
-    if (!name) return 'idle';
-    if (RESERVED_ANIM_NAMES.indexOf(name) >= 0) name = '_' + name;
-    return name;
-  }
-  /* 用数组而不是对象字面量：`{ __proto__: 1 }` 在对象字面量里是「设原型」
-     而不是「加一个键」，拿它当查表会得到 Object.prototype（恒真），
-     写出来是错的。（2026-11-05） */
-  var RESERVED_ANIM_NAMES = [
-    '__proto__', 'constructor', 'prototype',
-    'hasOwnProperty', 'isPrototypeOf', 'propertyIsEnumerable',
-    'toLocaleString', 'toString', 'valueOf'
-  ];
+  /* Spine 骨架里的动画名（2026-11-12 用户要求定死成三个短词）：
+       born  出生衔接动画（从无到有）
+       idle  首尾循环动画（有了以后一圈一圈）
+       die   结束衔接动画（从有到无）
+     原来主名字由「动画名称」输入框给、两段衔接在它后面加 _intro / _outro，
+     用户现在明确不要自定义名了（「把动画名称删除」），所以三条都写死。
+     注意 json 里 animations 的键名曾经是个坑：用户能自定义时，输入
+     __proto__ / constructor 这类名字会让 `anims[anName] = …` 变成改原型，
+     JSON.stringify 出来 animations 直接是 {}（动画整段消失，状态栏却还报着
+     关键帧数）。现在名字写死成 born / idle / die，不在危险名单里，这个坑
+     自然消失了 —— 顺带把当时为它写的 RESERVED_ANIM_NAMES 和清洗逻辑一起删掉。 */
+  var SPINE_ANIM_BORN = 'born';
+  var SPINE_ANIM_IDLE = 'idle';
+  var SPINE_ANIM_DIE = 'die';
 
   /* ------------------------------------------------------------------ */
-  /* 导出设置里的「将导出的动画」预览                                      */
+  /* 导出设置里的「动画」下拉                                             */
   /*                                                                    */
-  /* 2026-11-12 用户要求：在 Spine 版本下面显示「当前粒子系统的动画和有几个 */
-  /* 动画」。三段的分工是固定的一条生命线：                                */
-  /*   出生（从无到有）→ 循环（有了以后一圈一圈）→ 死亡（从有到无）        */
+  /* 2026-11-12 用户要求：把「将导出的动画」那一块改成和「动画名称」同样的 UI， */
+  /* 多个动画时能选一个在画布上预览，并把动画名称删掉。所以现在这一格既是    */
+  /* 「当前系统会导出哪几段」的清单，也是「画布上现在播哪一段」的开关。      */
+  /*                                                                    */
+  /* 顺序固定是一条生命线：born（出生）→ idle（循环）→ die（死亡）。      */
   /* 判据必须和 buildOneSystem 里逐字一致，否则界面上说有、导出却没有 ——    */
   /* 用户就是因为「点了开关看不出任何变化」才反复报这个问题的。              */
   /* ------------------------------------------------------------------ */
   function spineAnimPlan(s) {
     s = s || sys();
-    var base = spineAnimName();
     var stream = s.emission.mode === 'stream';
     var seamless = stream && !!s.emission.seamless;
-    var period = loopPeriod(s);
     var list = [];
-    if (stream && s.emission.intro) {
-      list.push({ role: '出生', name: base + '_intro', len: period, main: false });
+    if (seamless && s.emission.intro) {
+      list.push({ key: SPINE_ANIM_BORN, role: '出生', name: SPINE_ANIM_BORN });
     }
-    list.push({
-      role: seamless ? '循环' : '单次', name: base,
-      len: seamless ? period : naturalDuration(s), main: true
-    });
-    if (stream && s.emission.outro) {
-      /* 死亡段的长度要烘焙完才知道（是「预热结束那一批里最年轻的粒子还剩多久」，
-         跟发射窗口、生命、周期三者都有关），这里算不准就不显示数字 ——
-         与其标一个「≤ 最长生命」让人以为要播 3 秒、实际只有 1 秒，
-         不如老老实实只列名字。 */
-      list.push({ role: '死亡', name: base + '_outro', len: null, main: false });
+    /* 主循环永远有：没开首尾循环时它退化成「单次」，名字仍然是 idle */
+    list.push({ key: SPINE_ANIM_IDLE, role: seamless ? '循环' : '单次', name: SPINE_ANIM_IDLE, main: true });
+    if (seamless && s.emission.outro) {
+      list.push({ key: SPINE_ANIM_DIE, role: '死亡', name: SPINE_ANIM_DIE });
     }
     return list;
   }
 
-  /* 没生成的那两段用一句提示补上，用户才知道开关在哪、为什么是灰的 */
+  /* 没生成的那两段用一句提示补上，用户才知道开关在哪 */
   function animPlanHint(s) {
     s = s || sys();
     if (s.emission.mode !== 'stream') {
-      return '当前是「爆发」发射，只有一段。切到「持续」才能加出生 / 死亡衔接动画。';
+      return '当前是「爆发」发射，只有 idle 一段。切到「持续」才能加 born / die 衔接动画。';
     }
     if (!s.emission.seamless) {
-      return '打开「首尾循环」才会带上出生 / 死亡衔接动画。';
+      return '打开「首尾循环」才会带上 born / die 衔接动画。';
     }
     if (!s.emission.intro || !s.emission.outro) {
       return '勾选「生成衔接动画 / 生成结束衔接动画」可再加' +
@@ -16610,39 +16657,58 @@ window.addEventListener('unhandledrejection', function (event) {
     return '';
   }
 
-  /* 只有内容真的变了才重建 DOM：这个函数会跟着每个输入事件跑，
-     每次拖滑块都重建一遍既浪费又会让滚动位置跳。 */
+  /* 下拉的选项是「出生 born」这种「中文角色 + 英文动画名」的写法：
+     中文让用户一眼知道这一段是干嘛的，英文就是导出到 Spine 之后的名字。 */
   var animPreviewSig = null;
   function refreshAnimPreview() {
-    if (!dom.animChips) return;
+    if (!dom.animSelect) return;
     var list = spineAnimPlan();
     var hint = animPlanHint();
-    var sig = list.map(function (o) { return o.role + '|' + o.name + '|' + o.len; }).join('#') + '@' + hint;
-    if (sig === animPreviewSig) return;
-    animPreviewSig = sig;
+    var sig = list.map(function (o) { return o.key + '|' + o.role; }).join('#') + '@' + hint;
+    var sel = dom.animSelect;
+    /* 选中的那一段可能因为关掉了对应开关而不存在了 —— 那就退回 idle */
+    var want = previewAnim;
+    var has = false;
+    for (var q = 0; q < list.length; q++) if (list[q].key === want) has = true;
+    if (!has) want = SPINE_ANIM_IDLE;
 
+    if (sig !== animPreviewSig) {
+      animPreviewSig = sig;
+      while (sel.firstChild) sel.removeChild(sel.firstChild);
+      list.forEach(function (o) {
+        var opt = document.createElement('option');
+        opt.value = o.key;
+        opt.textContent = o.role + ' · ' + o.name;
+        sel.appendChild(opt);
+      });
+    }
+    if (sel.value !== want) sel.value = want;
     if (dom.animCount) dom.animCount.textContent = list.length + ' 个';
-    while (dom.animChips.firstChild) dom.animChips.removeChild(dom.animChips.firstChild);
-    list.forEach(function (o) {
-      var chip = document.createElement('div');
-      chip.className = 'pt-anim-chip' + (o.main ? ' is-main' : '');
-      var role = document.createElement('span');
-      role.className = 'pt-anim-role';
-      role.textContent = o.role;
-      var nm = document.createElement('span');
-      nm.className = 'pt-anim-name';
-      nm.textContent = o.name;
-      nm.title = o.name;
-      var len = document.createElement('span');
-      len.className = 'pt-anim-len';
-      len.textContent = o.len == null ? '' : o.len.toFixed(2) + 's';
-      chip.appendChild(role); chip.appendChild(nm); chip.appendChild(len);
-      dom.animChips.appendChild(chip);
-    });
     if (dom.animHint) {
       dom.animHint.textContent = hint;
       dom.animHint.hidden = !hint;
     }
+    /* 选中的那一段被关掉了：真的切回 idle，否则画布会停在一个
+       已经不该存在的预览模式上，而时间是按它算的 —— 时间条长度就错了。 */
+    if (want !== previewAnim) setPreviewAnim(want);
+  }
+
+  /* 切换画布上预览哪一段动画。
+     切的时候要把播放头拨回 0 并整块重算模拟：三段动画的起点完全不同
+     （出生从空场、循环从稳态第 0 帧、死亡从稳态停掉发射），
+     不重算的话会接着上一段的粒子往下跑，画面就乱了。 */
+  function setPreviewAnim(name) {
+    if (!name || PREVIEW_ANIMS.indexOf(name) < 0) name = SPINE_ANIM_IDLE;
+    if (previewAnim === name) return;
+    previewAnim = name === SPINE_ANIM_IDLE ? '' : name;
+    /* 三段动画的起点完全不同（出生从空场、循环从稳态第 0 帧、死亡从稳态
+       停掉发射），所以整块重算：把每一份 sim 都标脏、清掉 dieMode，
+       再从 0 推一遍。seek(0) 里已经把 stepTo / draw / refreshTransport 做完了。 */
+    for (var i = 0; i < sims.length; i++) { sims[i].dirty = true; sims[i].dieMode = false; }
+    cancelResim();
+    time = 0;
+    seek(0);
+    if (dom.animSelect && dom.animSelect.value !== name) dom.animSelect.value = name;
   }
 
   /* 精简容差：位移用世界单位，旋转用角度，缩放用倍率，颜色用 0-255 分量 */
@@ -17365,10 +17431,18 @@ window.addEventListener('unhandledrejection', function (event) {
     }
     } catch (bakeErr) {
       sim.mute = false;
+      sim.dieMode = false;
+      sim.dirty = true;
       unfocusSim();
       throw bakeErr;
     }
     sim.mute = false;
+    /* 烘焙把这份 sim 从起点整块重算过了，所以它现在是一个「普通时间轴」的状态，
+       不是死亡预览的稳态起点 —— 把两个标记清干净，否则回到编辑器后
+       stepOne 会以为死亡段已经预热好，直接往下推一段错的轨迹。
+       （2026-11-12：加了预览模式之后才发现导出会污染这份状态。） */
+    sim.dieMode = false;
+    sim.dirty = true;
     unfocusSim();
 
     /* 按发射序号（gid）归并：绕回段和本周期段属于同一根骨骼。
@@ -17489,7 +17563,7 @@ window.addEventListener('unhandledrejection', function (event) {
       if (introBaked.tracks.length) {
         var introLen = introBaked.total;
         anims.push({
-          name: animName + '_intro', baked: introBaked, len: introLen,
+          name: SPINE_ANIM_BORN, baked: introBaked, len: introLen,
           ramp: (function (L) { return function (t) { return clamp(t / L, 0, 1); }; })(introLen)
         });
       }
@@ -17502,7 +17576,7 @@ window.addEventListener('unhandledrejection', function (event) {
       for (var oi = 0; oi < outroBaked.tracks.length; oi++) outLen = Math.max(outLen, outroBaked.tracks[oi].last);
       if (outLen > 1e-4) {
         anims.push({
-          name: animName + '_outro', baked: outroBaked, len: outLen,
+          name: SPINE_ANIM_DIE, baked: outroBaked, len: outLen,
           ramp: (function (L) { return function (t) { return clamp(1 - t / L, 0, 1); }; })(outLen)
         });
       }
@@ -17822,7 +17896,10 @@ window.addEventListener('unhandledrejection', function (event) {
     if (!window.SpineExport) throw new Error('Spine 导出模块未载入');
 
     var ver = spineVersion();
-    var animName = spineAnimName();
+    /* 动画名固定三段：born / idle / die（见 SPINE_ANIM_* 的定义）。
+       以前主名字由「导出设置 → 动画名称」输入框给，2026-11-12 用户要求把那一行
+       删掉，改成下面那个「动画」下拉（只用来选预览哪一段），名字随之定死。 */
+    var animName = SPINE_ANIM_IDLE;
 
     /* 骨骼名在同一套骨架里不能重，系统名撞车时给后面的补 _2 / _3
        （两个系统都叫 "Particle System 1" 时，_GEN 和粒子骨骼都会撞）。 */
@@ -18151,10 +18228,14 @@ window.addEventListener('unhandledrejection', function (event) {
       setPlaying(!playing);
     });
     if (dom.exportSpine) dom.exportSpine.addEventListener('click', exportSpine);
-    /* 「动画名称」是导出设置里唯一一个不走 data-path 的控件（导出时才按 id 读），
-       所以这里单独挂一个监听，让下面的动画预览跟着名字一起变。 */
-    var animNameEl = document.getElementById('pt-anim-name');
-    if (animNameEl) animNameEl.addEventListener('input', refreshAnimPreview);
+    /* 「动画」下拉：选哪一段，画布上就播哪一段（2026-11-12）。
+       它不是导出参数 —— 三段动画该导出几段由「生成衔接动画 / 生成结束衔接动画」
+       两个开关决定，这里只切预览。 */
+    if (dom.animSelect) {
+      dom.animSelect.addEventListener('change', function () {
+        setPreviewAnim(dom.animSelect.value);
+      });
+    }
     dom.scrub.addEventListener('input', function () {
       if (playing) setPlaying(false);
       /* 拖动 scrub 时 input 事件远密于一帧，合并到每帧一次 seek（见 seekCoalesced） */
@@ -18350,7 +18431,7 @@ window.addEventListener('unhandledrejection', function (event) {
     dom.play = $('pt-play');
     dom.exportSpine = $('pt-export-spine');
     dom.animCount = $('pt-anim-count');
-    dom.animChips = $('pt-anim-chips');
+    dom.animSelect = $('pt-anim-select');
     dom.animHint = $('pt-anim-hint');
     dom.scrub = $('pt-scrub');
     dom.time = $('pt-time');
@@ -18527,6 +18608,10 @@ window.addEventListener('unhandledrejection', function (event) {
     setSystem: setSystem,
     addSystem: addSystem,
     seek: seek,
+    /* 预览哪一段导出动画（2026-11-12）：'' 是正常时间轴，'born' / 'die'
+       是两段衔接动画。界面上那个「动画」下拉走的是同一个函数。 */
+    setPreviewAnim: function (name) { setPreviewAnim(name || 'idle'); return previewAnim || 'idle'; },
+    getPreviewAnim: function () { return previewAnim || 'idle'; },
     play: function () { setPlaying(true); },
     pause: function () { setPlaying(false); },
     buildSpineBundle: buildSpineBundle,
