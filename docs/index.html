@@ -15472,15 +15472,7 @@ window.addEventListener('unhandledrejection', function (event) {
     refreshAnimPreview();
     /* 粒子面板里的滑块也是写死的 range：程序改完值（切系统 / 恢复默认）
        要顺手把轨道填充补上，否则滑块位置变了、高亮还停在旧比例。 */
-    Array.prototype.forEach.call(document.querySelectorAll('#particle-view input[type="range"]'), function (r) {
-      var min = Number(r.min);
-      var max = Number(r.max);
-      var val = Number(r.value);
-      var pct = max > min ? ((val - min) / (max - min)) * 100 : 0;
-      if (r.style && r.style.setProperty) {
-        r.style.setProperty('--fill', Math.max(0, Math.min(100, pct)) + '%');
-      }
-    });
+    Array.prototype.forEach.call(document.querySelectorAll('#particle-view input[type="range"]'), fillRange);
   }
 
   /* 参数改完立刻重算当前时刻（2026-11-03 第二十六轮，用户反馈「我修改一些
@@ -16428,12 +16420,32 @@ window.addEventListener('unhandledrejection', function (event) {
   /* Transport / playback                                               */
   /* ------------------------------------------------------------------ */
 
+  /* 原生 range 的轨道是用 CSS 变量 `--fill` 画的那条已填充高亮
+     （见全局 input[type="range"]::-webkit-slider-runnable-track 的 linear-gradient）。
+     这个变量平时只有「用户拖动」那一下会更新（initRangeFills 挂在 input 事件上），
+     而播放 / seek 时 value 是 JS 直接赋的，**不发 input 事件** ——
+     于是滑块头一直在走，轨道填充却永远停在 0%，看着就像整条进度条卡死。
+     2026-11-12 用户报的「下面的进度条还是卡住」就是这个：
+     实测播放中 scrub.value 从 633 走到 850，--fill 一直是 0%。
+     凡是程序改 range 的值，都得顺手补这一下。 */
+  function fillRange(el) {
+    if (!el || !el.style || !el.style.setProperty) return;
+    var min = Number(el.min);
+    var max = Number(el.max);
+    var val = Number(el.value);
+    if (!isFinite(min) || !isFinite(max) || !isFinite(val)) return;
+    var pct = max > min ? ((val - min) / (max - min)) * 100 : 0;
+    el.style.setProperty('--fill', Math.max(0, Math.min(100, pct)) + '%');
+  }
+
   function refreshTransport() {
     var d = duration();
     var ms = Math.round(d * 1000);
     if (dom.scrub) {
       dom.scrub.max = String(ms);
       dom.scrub.value = String(clamp(Math.round(time * 1000), 0, ms));
+      /* 进度条填充跟着一起走（见 fillRange 的说明） */
+      fillRange(dom.scrub);
     }
     if (dom.time) dom.time.textContent = time.toFixed(2) + ' / ' + d.toFixed(2) + 's';
     if (dom.play) dom.play.textContent = playing ? '❚❚' : '▶';
