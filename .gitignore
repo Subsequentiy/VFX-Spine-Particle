@@ -1,0 +1,4 @@
+# 主文件（编辑用的那一份）。它的内容与 docs/index.html 完全相同，
+# 后者才是 GitHub Pages 发布的页面。这里忽略它，避免仓库里出现两份
+# 800KB 的同内容文件，也避免它显示为「未跟踪文件」。
+/VFX Spine Particle.html
