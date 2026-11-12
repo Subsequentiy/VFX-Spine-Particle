@@ -1897,17 +1897,42 @@ body.particle-active .sidebar { display: none !important; }
 .pt-export-spine { width: 100%; height: 27px; }
 
 /* 「动画」这一行（2026-11-12 用户要求）。
-   它取代了原来的「动画名称」输入框：骨架里的动画名现在固定是 born / idle / die
-   三段，不用再起名，所以这一格换成下拉 —— 选哪一段，画布上就播哪一段。
-   行布局沿用 pt-export-row（82px 标签 + 中间一格 + 18px 空列），
-   和上面的「Spine 版本」完全对齐。 */
-#pt-export-group .pt-anim-row > .pt-inline { gap: 6px; }
-/* 下拉吃掉剩下的宽度，右边的「N 个」按内容宽，不再撑满整格 */
-#pt-export-group .pt-anim-row .pt-select { flex: 1 1 auto; width: auto; min-width: 0; }
-.pt-anim-count {
-  flex: none; white-space: nowrap;
-  font: 9.5px var(--mono); color: var(--accent);
+   它取代了原来的「动画名称」输入框。三段动画全部常驻展开列成一竖排，
+   每行只显示英文名（born / idle / die）；单击预览那一段，双击改名。
+   整块宽度和上面的「Spine 版本」下拉一样占满中间那一格。
+   右下角原来那个「N 个」按用户要求去掉了 —— 展开的列表本身就是清单。 */
+#pt-export-group .pt-anim-row > .pt-inline { width: 100%; margin-right: 0; }
+.pt-anim-list {
+  width: 100%; min-width: 0;
+  display: flex; flex-direction: column;
+  border: 1px solid var(--line); border-radius: 6px;
+  background: #0c0e13; overflow: hidden;
 }
+.pt-anim-item {
+  display: flex; align-items: center; gap: 5px;
+  width: 100%; min-width: 0; height: 25px; padding: 0 7px;
+  border: 0; background: transparent; color: var(--text);
+  font: 11px var(--mono); text-align: left; cursor: pointer;
+}
+.pt-anim-item + .pt-anim-item { border-top: 1px solid var(--line-soft); }
+.pt-anim-item:hover { background: #12151c; }
+/* 选中（= 画布上正在播的那一段）：和别处「active」用同一套紫色 */
+.pt-anim-item.is-active {
+  background: rgba(139, 92, 246, .16);
+  color: #d8ccff; box-shadow: inset 2px 0 0 var(--accent);
+}
+.pt-anim-item-name {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* 双击改名时就地换成输入框：尺寸和行一致，不跳动 */
+.pt-anim-rename {
+  width: 100%; height: 21px; min-width: 0;
+  border: 1px solid rgba(167, 139, 250, .65); border-radius: 4px;
+  background: #0c0e13; color: var(--text);
+  padding: 0 5px; font: 11px var(--mono); text-align: left;
+}
+.pt-anim-rename:focus { outline: none; border-color: var(--accent); }
 .pt-anim-hint { font-size: 9px; line-height: 1.5; color: #6e7280; }
 
 /* ---- body columns ---- */
@@ -3029,17 +3054,16 @@ body.particle-active .sidebar { display: none !important; }
               </select>
             </span>
           </div>
-          <!-- 「动画」（2026-11-12 用户要求）：这一行取代了原来的「动画名称」输入框
-               （那一行已删）—— 骨架里的动画名现在是固定的三段：born（出生）/
-               idle（循环）/ die（死亡），不需要用户再起名。下拉里列出当前这个
-               粒子系统实际会导出的那几段，选哪一段，画布上就播哪一段，
-               出生和死亡衔接动画因此也能在编辑器里直接看。 -->
+          <!-- 「动画」（2026-11-12 用户要求）：这一行取代了原来的「动画名称」
+               输入框（那一行已删）。三段动画全部**常驻展开**列出来，只显示英文名
+               （born / idle / die），点一下就预览那一段，双击名字可以改。
+               宽度和上面的「Spine 版本」下拉对齐（都是整格 100%）。
+               原来右下角那个「N 个」按用户要求去掉了。 -->
           <div class="pt-field pt-export-row pt-anim-row">
             <span class="pt-label">动画</span>
             <span class="pt-inline">
-              <select class="pt-select" id="pt-anim-select" aria-label="动画"
-                title="选择要预览的动画：出生（born）→ 循环（idle）→ 死亡（die），依次播就是粒子完整的一生"></select>
-              <span class="pt-anim-count" id="pt-anim-count">1 个</span>
+              <div class="pt-anim-list" id="pt-anim-list" role="listbox"
+                aria-label="动画：单击预览，双击改名"></div>
             </span>
           </div>
           <div class="pt-field full pt-anim-preview">
@@ -16598,45 +16622,78 @@ window.addEventListener('unhandledrejection', function (event) {
     return SPINE_VERSIONS[id] || SPINE_VERSIONS['3.8'];
   }
 
-  /* Spine 骨架里的动画名（2026-11-12 用户要求定死成三个短词）：
-       born  出生衔接动画（从无到有）
-       idle  首尾循环动画（有了以后一圈一圈）
-       die   结束衔接动画（从有到无）
-     原来主名字由「动画名称」输入框给、两段衔接在它后面加 _intro / _outro，
-     用户现在明确不要自定义名了（「把动画名称删除」），所以三条都写死。
-     注意 json 里 animations 的键名曾经是个坑：用户能自定义时，输入
-     __proto__ / constructor 这类名字会让 `anims[anName] = …` 变成改原型，
-     JSON.stringify 出来 animations 直接是 {}（动画整段消失，状态栏却还报着
-     关键帧数）。现在名字写死成 born / idle / die，不在危险名单里，这个坑
-     自然消失了 —— 顺带把当时为它写的 RESERVED_ANIM_NAMES 和清洗逻辑一起删掉。 */
-  var SPINE_ANIM_BORN = 'born';
-  var SPINE_ANIM_IDLE = 'idle';
-  var SPINE_ANIM_DIE = 'die';
+  /* ------------------------------------------------------------------ */
+  /* Spine 动画名                                                        */
+  /*                                                                    */
+  /* 三段是一条生命线，顺序固定：                                         */
+  /*   born  出生衔接（从无到有）→ idle 循环（一圈一圈）→ die 结束（从有到无）*/
+  /* 2026-11-12 用户要求：只显示英文名；支持双击改名。                     */
+  /* 所以名字不再是常量，而是存在下面这张表里，可以被改名、也可以被存进预设。 */
+  /*                                                                    */
+  /* json 里 animations 的键名曾经是个坑：用户能自定义时输入 __proto__ /   */
+  /* constructor 这类名字会让 `anims[anName] = …` 变成改原型，            */
+  /* JSON.stringify 出来 animations 直接是 {}（动画整段消失，状态栏却还报  */
+  /* 关键帧数）。所以清洗逻辑必须留着 —— 见 animNameClean。               */
+  /* ------------------------------------------------------------------ */
+  var ANIM_NAME_DEFAULT = { born: 'born', idle: 'idle', die: 'die' };
+  var animNames = { born: 'born', idle: 'idle', die: 'die' };
+  var ANIM_ROLE_KEYS = ['born', 'idle', 'die'];
+
+  /* 会被当成「原型链上的名字」而不能当 json 键的那些。 */
+  var RESERVED_ANIM_NAMES = [
+    '__proto__', 'constructor', 'prototype',
+    'hasOwnProperty', 'isPrototypeOf', 'propertyIsEnumerable',
+    'toLocaleString', 'toString', 'valueOf'
+  ];
+
+  /* 动画名清洗：控制字符换空格、连续空白压一个、首尾去掉；
+     撞上原型链名字就加下划线前缀（而不是退回默认名 —— 用户能看出被动过）；
+     清空或只剩空白就退回这一段自己的默认名。 */
+  function animNameClean(raw, fallbackKey) {
+    var name = String(raw == null ? '' : raw)
+      .replace(/[\u0000-\u001f\u007f]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 48);
+    if (!name) return ANIM_NAME_DEFAULT[fallbackKey] || 'idle';
+    if (RESERVED_ANIM_NAMES.indexOf(name) >= 0) name = '_' + name;
+    return name;
+  }
+
+  /* 三段名字互不相同：同一个骨架里两个动画叫同一个名字，后写的会盖掉前一个
+     （json 里 animations 是按名字当键的），用户就少一段动画。
+     改名时如果撞上另外两段，自动补 _2、_3。 */
+  function animNameUnique(name, key) {
+    var others = [];
+    for (var i = 0; i < ANIM_ROLE_KEYS.length; i++) {
+      var k = ANIM_ROLE_KEYS[i];
+      if (k !== key) others.push(animNames[k]);
+    }
+    var out = name, dup = 2;
+    while (others.indexOf(out) >= 0) { out = name + '_' + dup; dup++; }
+    return out;
+  }
 
   /* ------------------------------------------------------------------ */
-  /* 导出设置里的「动画」下拉                                             */
+  /* 导出设置里的「动画」列表                                             */
   /*                                                                    */
-  /* 2026-11-12 用户要求：把「将导出的动画」那一块改成和「动画名称」同样的 UI， */
-  /* 多个动画时能选一个在画布上预览，并把动画名称删掉。所以现在这一格既是    */
-  /* 「当前系统会导出哪几段」的清单，也是「画布上现在播哪一段」的开关。      */
+  /* 2026-11-12 用户要求：多个动画时默认全部展开、只显示英文名、           */
+  /* 不再显示「N 个」、宽度和「Spine 版本」下拉一样长、单击预览、双击改名。 */
   /*                                                                    */
-  /* 顺序固定是一条生命线：born（出生）→ idle（循环）→ die（死亡）。      */
-  /* 判据必须和 buildOneSystem 里逐字一致，否则界面上说有、导出却没有 ——    */
-  /* 用户就是因为「点了开关看不出任何变化」才反复报这个问题的。              */
+  /* 哪几段会导出，判据必须和 buildOneSystem 里逐字一致，否则界面上说有、   */
+  /* 导出却没有 —— 用户就是因为「点了开关看不出任何变化」才反复报这个问题的。*/
   /* ------------------------------------------------------------------ */
   function spineAnimPlan(s) {
     s = s || sys();
     var stream = s.emission.mode === 'stream';
     var seamless = stream && !!s.emission.seamless;
     var list = [];
-    if (seamless && s.emission.intro) {
-      list.push({ key: SPINE_ANIM_BORN, role: '出生', name: SPINE_ANIM_BORN });
-    }
-    /* 主循环永远有：没开首尾循环时它退化成「单次」，名字仍然是 idle */
-    list.push({ key: SPINE_ANIM_IDLE, role: seamless ? '循环' : '单次', name: SPINE_ANIM_IDLE, main: true });
-    if (seamless && s.emission.outro) {
-      list.push({ key: SPINE_ANIM_DIE, role: '死亡', name: SPINE_ANIM_DIE });
-    }
+    /* 三段全部常驻展开（用户要求「有多个动画时默认全部展开」）：
+       没开的那两段也列出来，只标成不可用（灰、点不动），
+       这样用户一眼看得到三段的关系，也看得到哪一段还没开。 */
+    list.push({ key: 'born', name: animNames.born, enabled: seamless && !!s.emission.intro });
+    list.push({ key: 'idle', name: animNames.idle, enabled: true, main: true });
+    list.push({ key: 'die', name: animNames.die, enabled: seamless && !!s.emission.outro });
     return list;
   }
 
@@ -16644,7 +16701,7 @@ window.addEventListener('unhandledrejection', function (event) {
   function animPlanHint(s) {
     s = s || sys();
     if (s.emission.mode !== 'stream') {
-      return '当前是「爆发」发射，只有 idle 一段。切到「持续」才能加 born / die 衔接动画。';
+      return '当前是「爆发」发射，只导出 idle。切到「持续」才能加 born / die 衔接动画。';
     }
     if (!s.emission.seamless) {
       return '打开「首尾循环」才会带上 born / die 衔接动画。';
@@ -16657,50 +16714,101 @@ window.addEventListener('unhandledrejection', function (event) {
     return '';
   }
 
-  /* 下拉的选项是「出生 born」这种「中文角色 + 英文动画名」的写法：
-     中文让用户一眼知道这一段是干嘛的，英文就是导出到 Spine 之后的名字。 */
   var animPreviewSig = null;
+  var animRenaming = null;      /* 正在改名的那一段的 key，null 表示没在改 */
   function refreshAnimPreview() {
-    if (!dom.animSelect) return;
+    if (!dom.animList) return;
     var list = spineAnimPlan();
     var hint = animPlanHint();
-    var sig = list.map(function (o) { return o.key + '|' + o.role; }).join('#') + '@' + hint;
-    var sel = dom.animSelect;
-    /* 选中的那一段可能因为关掉了对应开关而不存在了 —— 那就退回 idle */
-    var want = previewAnim;
-    var has = false;
-    for (var q = 0; q < list.length; q++) if (list[q].key === want) has = true;
-    if (!has) want = SPINE_ANIM_IDLE;
+    var sig = list.map(function (o) { return o.key + '|' + o.name + '|' + (o.enabled ? 1 : 0); })
+      .join('#') + '@' + hint + '@' + previewAnim + '@' + animRenaming;
+    if (sig === animPreviewSig) return;
+    animPreviewSig = sig;
 
-    if (sig !== animPreviewSig) {
-      animPreviewSig = sig;
-      while (sel.firstChild) sel.removeChild(sel.firstChild);
-      list.forEach(function (o) {
-        var opt = document.createElement('option');
-        opt.value = o.key;
-        opt.textContent = o.role + ' · ' + o.name;
-        sel.appendChild(opt);
-      });
-    }
-    if (sel.value !== want) sel.value = want;
-    if (dom.animCount) dom.animCount.textContent = list.length + ' 个';
+    /* 选中的那一段被关掉了：退回 idle（画布不能停在一段不存在的预览上，
+       时间是按它算的 —— 时间条长度就错了）。 */
+    var active = previewAnim || 'idle';
+    var activeOk = false;
+    for (var q = 0; q < list.length; q++) if (list[q].key === active && list[q].enabled) activeOk = true;
+    if (!activeOk) setTimeout(function () { setPreviewAnim('idle'); }, 0);
+
+    var box = dom.animList;
+    while (box.firstChild) box.removeChild(box.firstChild);
+    list.forEach(function (o) {
+      var row = document.createElement('div');
+      row.className = 'pt-anim-item' + (o.key === active ? ' is-active' : '');
+      row.setAttribute('data-anim-key', o.key);
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', o.key === active ? 'true' : 'false');
+      if (!o.enabled) {
+        row.style.opacity = '.45';
+        row.setAttribute('data-anim-off', '1');
+        row.title = '这一段还没生成：' + (o.key === 'born'
+          ? '勾选「生成衔接动画」' : '勾选「生成结束衔接动画」');
+      } else {
+        row.title = '单击预览，双击改名';
+      }
+      if (animRenaming === o.key) {
+        /* 就地换成输入框：宽度和行一致，不会跳。 */
+        var inp = document.createElement('input');
+        inp.className = 'pt-anim-rename';
+        inp.type = 'text';
+        inp.value = o.name;
+        inp.maxLength = 48;
+        inp.spellcheck = false;
+        inp.setAttribute('data-anim-rename', o.key);
+        row.appendChild(inp);
+        /* 插进 DOM 之后才能聚焦，放到下一个微任务里做 */
+        setTimeout(function () { inp.focus(); inp.select(); }, 0);
+      } else {
+        var nm = document.createElement('span');
+        nm.className = 'pt-anim-item-name';
+        nm.textContent = o.name;
+        row.appendChild(nm);
+      }
+      box.appendChild(row);
+    });
     if (dom.animHint) {
       dom.animHint.textContent = hint;
       dom.animHint.hidden = !hint;
     }
-    /* 选中的那一段被关掉了：真的切回 idle，否则画布会停在一个
-       已经不该存在的预览模式上，而时间是按它算的 —— 时间条长度就错了。 */
-    if (want !== previewAnim) setPreviewAnim(want);
   }
 
+  /* 开始改名：把这一段切换成输入框。 */
+  function beginAnimRename(key) {
+    if (ANIM_ROLE_KEYS.indexOf(key) < 0) return;
+    animRenaming = key;
+    animPreviewSig = null;
+    refreshAnimPreview();
+  }
+
+  /* 结束改名：commit 为 false 时原样恢复。 */
+  function endAnimRename(key, value, commit) {
+    if (animRenaming !== key) return;
+    animRenaming = null;
+    if (commit) {
+      var next = animNameUnique(animNameClean(value, key), key);
+      if (next !== animNames[key]) {
+        animNames[key] = next;
+        if (key === 'idle') {
+          /* idle 是主循环，改名不影响预览（previewAnim 存的是 born/die，
+             空串就是循环），所以这里什么都不用做。 */
+        }
+        if (window.__vfxHistory && window.__vfxHistory.touch) window.__vfxHistory.touch();
+      }
+    }
+    animPreviewSig = null;
+    refreshAnimPreview();
+    /* 改名不影响粒子，不用重算模拟；但导出 / 状态栏用的是新名字 */
+  }
   /* 切换画布上预览哪一段动画。
      切的时候要把播放头拨回 0 并整块重算模拟：三段动画的起点完全不同
      （出生从空场、循环从稳态第 0 帧、死亡从稳态停掉发射），
      不重算的话会接着上一段的粒子往下跑，画面就乱了。 */
   function setPreviewAnim(name) {
-    if (!name || PREVIEW_ANIMS.indexOf(name) < 0) name = SPINE_ANIM_IDLE;
-    if (previewAnim === name) return;
-    previewAnim = name === SPINE_ANIM_IDLE ? '' : name;
+    if (!name || PREVIEW_ANIMS.indexOf(name) < 0) name = 'idle';
+    if ((previewAnim || 'idle') === name) return;
+    previewAnim = name === 'idle' ? '' : name;
     /* 三段动画的起点完全不同（出生从空场、循环从稳态第 0 帧、死亡从稳态
        停掉发射），所以整块重算：把每一份 sim 都标脏、清掉 dieMode，
        再从 0 推一遍。seek(0) 里已经把 stepTo / draw / refreshTransport 做完了。 */
@@ -16708,7 +16816,8 @@ window.addEventListener('unhandledrejection', function (event) {
     cancelResim();
     time = 0;
     seek(0);
-    if (dom.animSelect && dom.animSelect.value !== name) dom.animSelect.value = name;
+    animPreviewSig = null;
+    refreshAnimPreview();
   }
 
   /* 精简容差：位移用世界单位，旋转用角度，缩放用倍率，颜色用 0-255 分量 */
@@ -17563,7 +17672,7 @@ window.addEventListener('unhandledrejection', function (event) {
       if (introBaked.tracks.length) {
         var introLen = introBaked.total;
         anims.push({
-          name: SPINE_ANIM_BORN, baked: introBaked, len: introLen,
+          name: animNames.born, baked: introBaked, len: introLen,
           ramp: (function (L) { return function (t) { return clamp(t / L, 0, 1); }; })(introLen)
         });
       }
@@ -17576,7 +17685,7 @@ window.addEventListener('unhandledrejection', function (event) {
       for (var oi = 0; oi < outroBaked.tracks.length; oi++) outLen = Math.max(outLen, outroBaked.tracks[oi].last);
       if (outLen > 1e-4) {
         anims.push({
-          name: SPINE_ANIM_DIE, baked: outroBaked, len: outLen,
+          name: animNames.die, baked: outroBaked, len: outLen,
           ramp: (function (L) { return function (t) { return clamp(1 - t / L, 0, 1); }; })(outLen)
         });
       }
@@ -17896,10 +18005,10 @@ window.addEventListener('unhandledrejection', function (event) {
     if (!window.SpineExport) throw new Error('Spine 导出模块未载入');
 
     var ver = spineVersion();
-    /* 动画名固定三段：born / idle / die（见 SPINE_ANIM_* 的定义）。
-       以前主名字由「导出设置 → 动画名称」输入框给，2026-11-12 用户要求把那一行
-       删掉，改成下面那个「动画」下拉（只用来选预览哪一段），名字随之定死。 */
-    var animName = SPINE_ANIM_IDLE;
+    /* 动画名三段：born / idle / die，默认就是这三个英文词，双击列表可以改
+       （见 animNames / animNameClean）。改过的名字会一路带到导出的 json 和
+       状态栏里，导出后 Spine 里看到的就是这个。 */
+    var animName = animNames.idle;
 
     /* 骨骼名在同一套骨架里不能重，系统名撞车时给后面的补 _2 / _3
        （两个系统都叫 "Particle System 1" 时，_GEN 和粒子骨骼都会撞）。 */
@@ -18228,13 +18337,39 @@ window.addEventListener('unhandledrejection', function (event) {
       setPlaying(!playing);
     });
     if (dom.exportSpine) dom.exportSpine.addEventListener('click', exportSpine);
-    /* 「动画」下拉：选哪一段，画布上就播哪一段（2026-11-12）。
-       它不是导出参数 —— 三段动画该导出几段由「生成衔接动画 / 生成结束衔接动画」
-       两个开关决定，这里只切预览。 */
-    if (dom.animSelect) {
-      dom.animSelect.addEventListener('change', function () {
-        setPreviewAnim(dom.animSelect.value);
+    /* 「动画」列表：单击预览那一段，双击名字就地改名（2026-11-12）。
+       它不是导出参数 —— 导出几段由「生成衔接动画 / 生成结束衔接动画」
+       两个开关决定，这里只切预览。
+       用事件委托挂在容器上：列表是动态重建的，逐行挂监听会越积越多。 */
+    if (dom.animList) {
+      dom.animList.addEventListener('click', function (event) {
+        if (event.target.closest && event.target.closest('[data-anim-rename]')) return;
+        var row = event.target.closest ? event.target.closest('[data-anim-key]') : null;
+        if (!row || row.getAttribute('data-anim-off') === '1') return;
+        setPreviewAnim(row.getAttribute('data-anim-key'));
       });
+      dom.animList.addEventListener('dblclick', function (event) {
+        if (event.target.closest && event.target.closest('[data-anim-rename]')) return;
+        var row = event.target.closest ? event.target.closest('[data-anim-key]') : null;
+        if (!row) return;
+        beginAnimRename(row.getAttribute('data-anim-key'));
+      });
+      /* 改名输入框：回车 / 失焦提交，Esc 取消 */
+      dom.animList.addEventListener('keydown', function (event) {
+        var inp = event.target.closest ? event.target.closest('[data-anim-rename]') : null;
+        if (!inp) return;
+        if (event.key === 'Enter') { event.preventDefault(); inp.blur(); }
+        else if (event.key === 'Escape') {
+          event.preventDefault();
+          inp.__cancelled = true;
+          endAnimRename(inp.getAttribute('data-anim-rename'), inp.value, false);
+        }
+      });
+      dom.animList.addEventListener('blur', function (event) {
+        var inp = event.target.closest ? event.target.closest('[data-anim-rename]') : null;
+        if (!inp || inp.__cancelled) return;
+        endAnimRename(inp.getAttribute('data-anim-rename'), inp.value, true);
+      }, true);
     }
     dom.scrub.addEventListener('input', function () {
       if (playing) setPlaying(false);
@@ -18430,8 +18565,7 @@ window.addEventListener('unhandledrejection', function (event) {
     dom.hudRight = $('pt-hud-right');
     dom.play = $('pt-play');
     dom.exportSpine = $('pt-export-spine');
-    dom.animCount = $('pt-anim-count');
-    dom.animSelect = $('pt-anim-select');
+    dom.animList = $('pt-anim-list');
     dom.animHint = $('pt-anim-hint');
     dom.scrub = $('pt-scrub');
     dom.time = $('pt-time');
@@ -18490,6 +18624,9 @@ window.addEventListener('unhandledrejection', function (event) {
       systems: clone(systems),
       current: current,
       time: time,
+      /* 动画名（2026-11-12 起可双击改）也进撤销栈：改名不动粒子，
+         但它是用户能看见的编辑动作，Ctrl+Z 该把它退回去。 */
+      animNames: { born: animNames.born, idle: animNames.idle, die: animNames.die },
       bg: { url: bgLayer.url, img: bgLayer.img, name: bgLayer.name, show: bgLayer.show }
     };
   }
@@ -18507,7 +18644,8 @@ window.addEventListener('unhandledrejection', function (event) {
           return [im.id, im.name, im.weight, im.scale, im.url];
         })
       };
-    })) + '|' + current + '|' + (bgLayer.name || '') + (bgLayer.url || '') + (bgLayer.show ? '1' : '0');
+    })) + '|' + current + '|' + (bgLayer.name || '') + (bgLayer.url || '') + (bgLayer.show ? '1' : '0') +
+      '|an:' + animNames.born + ',' + animNames.idle + ',' + animNames.die;
   }
 
   function particleHistoryRestore(snap) {
@@ -18525,11 +18663,21 @@ window.addEventListener('unhandledrejection', function (event) {
     };
     imagesSig = null;
     spriteCacheReset();
+    /* 动画名跟着快照一起回来（2026-11-12 起可双击改，要能 Ctrl+Z 撤销） */
+    if (snap.animNames) {
+      animNames = {
+        born: snap.animNames.born || ANIM_NAME_DEFAULT.born,
+        idle: snap.animNames.idle || ANIM_NAME_DEFAULT.idle,
+        die: snap.animNames.die || ANIM_NAME_DEFAULT.die
+      };
+      animPreviewSig = null;
+    }
     syncSims();
     renderList();
     renderImages();
     syncControls();
     syncBgButtons();
+    refreshAnimPreview();
     refreshTransport();
     /* seek 会把每个系统从 0 重新推演到 snap.time，
        所以这里不需要（也不该）再单独 resetSim。 */
