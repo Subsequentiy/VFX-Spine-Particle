@@ -144,6 +144,19 @@ button { -webkit-tap-highlight-color: transparent; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 标题右边的版本号（2026-11-12 用户要求「增加版本号」）。
+   小一号、淡一档，贴着标题基线；和 h1 之间由 gap 隔开。 */
+.brand-ver {
+  font: 9.5px var(--mono);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #7d7f8a;
+  padding: 1px 5px;
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  background: #14171d;
+  flex: none;
+}
 
 .topbar-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 /* 右上角：亮度在上、输出文件夹在下 */
@@ -2598,7 +2611,7 @@ body.particle-active .sidebar { display: none !important; }
         </svg>
       </div>
       <div class="brand-copy">
-        <h1>VFX Spine Particle</h1>
+        <h1>VFX Spine Particle<span class="brand-ver" id="app-version">v1.1</span></h1>
       </div>
     </div>
     <div class="topbar-actions">
@@ -2726,7 +2739,7 @@ body.particle-active .sidebar { display: none !important; }
       <div class="sidebar-foot" id="sidebar-foot">
         <div class="foot-row" id="foot-row">
           <button class="text-btn" id="btn-reset" type="button">恢复默认参数</button>
-          <span class="version">v1.0 · 本地运行</span>
+          <span class="version">v1.1</span>
         </div>
       </div>
     </aside>
@@ -14131,6 +14144,45 @@ window.addEventListener('unhandledrejection', function (event) {
     return ['curve'];
   }
 
+  /* 改了「范围」之后，把曲线上每个点按新旧范围的**相对位置**重算一遍。
+     （2026-11-12 用户报的 bug：「打开生命周期内旋转修改范围后，曲线不会跟着改变」。）
+
+     曲线点的纵坐标存的是**绝对值**（度/秒、倍率、0~1），画布把「范围」当成
+     纵轴刻度。所以范围一改，刻度变了、点还停在旧刻度上 —— 画出来就是
+     「范围拉大了，曲线却还挤在中间」。
+     预设那边本来就是按范围算的（spinPresetTable 用 lo + span × 归一化值），
+     只有「已经落在模型里的那串绝对数」没跟着走，补的就是这一下。
+
+     重算按相对位置来：旧范围里处在 0.75 高度的点，在新范围里还是 0.75 高度。
+     用户举的例子：范围从 −180~180 改成 −360~360，「对转恒速」的上曲线原本
+     恒为 +180（相对位置 1.0）→ 变成 +360；下曲线恒为 −180（相对位置 0.0）
+     → 变成 −360。正好是想要的结果。
+
+     切线（点的第 3、4 项，单位 dv/du）按高度缩放同样的倍数，否则手调过的
+     曲线改完范围角度会歪掉。 */
+  function rescaleLifeCurves(key, oldLo, oldHi) {
+    var cfg = lifeCfg(key);
+    if (!cfg) return;
+    var box = lifeBounds(cfg);
+    var newLo = box[0], newHi = box[1];
+    var oldSpan = oldHi - oldLo;
+    var newSpan = newHi - newLo;
+    if (!(Math.abs(oldSpan) > 1e-9) || !(Math.abs(newSpan) > 1e-9)) return;
+    var k = newSpan / oldSpan;
+    curveFields(key).forEach(function (f) {
+      var pts = cfg[f];
+      if (!Array.isArray(pts)) return;
+      for (var i = 0; i < pts.length; i++) {
+        var p = pts[i];
+        if (!p) continue;
+        /* 相对位置 → 新范围 */
+        p[1] = newLo + (Number(p[1]) - oldLo) * k;
+        if (p[2] != null && isFinite(Number(p[2]))) p[2] = Number(p[2]) * k;
+        if (p[3] != null && isFinite(Number(p[3]))) p[3] = Number(p[3]) * k;
+      }
+    });
+  }
+
   function lifePointAt(canvas, clientX, clientY) {
     var key = canvas.getAttribute('data-curve');
     var cfg = lifeCfg(key);
@@ -15664,7 +15716,18 @@ window.addEventListener('unhandledrejection', function (event) {
 
     if (/^life\.color\.(from|to)$/.test(path) && !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(val))) return;
 
+    /* 改「范围」之前先把旧范围记下来（2026-11-12）：曲线点存的是绝对值，
+       范围一改刻度就变了，点得按相对位置跟着重算 —— 见 rescaleLifeCurves。 */
+    var lifeRange = /^life\.([a-zA-Z]+)\.(min|max)$/.exec(path);
+    var oldBox = null;
+    if (lifeRange) {
+      var rc = lifeCfg(lifeRange[1]);
+      if (rc) oldBox = lifeBounds(rc);
+    }
+
     pathSet(sys(), path, val);
+
+    if (oldBox && lifeRange) rescaleLifeCurves(lifeRange[1], oldBox[0], oldBox[1]);
 
     /* 这里原来还有一句 `if (path === 'name') renderList();` —— 是给「对象属性 →
        系统名称」那个输入框用的。2026-10-31 第四轮那一行删掉之后，界面上再没有
@@ -16688,29 +16751,26 @@ window.addEventListener('unhandledrejection', function (event) {
     var stream = s.emission.mode === 'stream';
     var seamless = stream && !!s.emission.seamless;
     var list = [];
-    /* 三段全部常驻展开（用户要求「有多个动画时默认全部展开」）：
-       没开的那两段也列出来，只标成不可用（灰、点不动），
-       这样用户一眼看得到三段的关系，也看得到哪一段还没开。 */
-    list.push({ key: 'born', name: animNames.born, enabled: seamless && !!s.emission.intro });
-    list.push({ key: 'idle', name: animNames.idle, enabled: true, main: true });
-    list.push({ key: 'die', name: animNames.die, enabled: seamless && !!s.emission.outro });
+    /* 列表里只放「真的会导出」的那几段（2026-11-12 用户要求）：
+       idle 永远在；born 只有开了「生成衔接动画」才出现；
+       die 只有开了「生成结束衔接动画」才出现。
+       没开的不列出来 —— 列表是「当前骨架里有哪些动画」，不是开关说明书。 */
+    if (seamless && s.emission.intro) {
+      list.push({ key: 'born', name: animNames.born });
+    }
+    list.push({ key: 'idle', name: animNames.idle, main: true });
+    if (seamless && s.emission.outro) {
+      list.push({ key: 'die', name: animNames.die });
+    }
     return list;
   }
 
-  /* 没生成的那两段用一句提示补上，用户才知道开关在哪 */
+  /* 列表为空时的兜底提示（正常不会空，idle 永远在）。
+     2026-11-12 用户要求把「勾选…可再加死亡一段」那句删掉，所以这里
+     只在「一段都没有」这种异常情况下给一句话。 */
   function animPlanHint(s) {
     s = s || sys();
-    if (s.emission.mode !== 'stream') {
-      return '当前是「爆发」发射，只导出 idle。切到「持续」才能加 born / die 衔接动画。';
-    }
-    if (!s.emission.seamless) {
-      return '打开「首尾循环」才会带上 born / die 衔接动画。';
-    }
-    if (!s.emission.intro || !s.emission.outro) {
-      return '勾选「生成衔接动画 / 生成结束衔接动画」可再加' +
-        (!s.emission.intro && !s.emission.outro ? '出生和死亡两段' :
-          (!s.emission.intro ? '出生一段' : '死亡一段')) + '。';
-    }
+    if (!spineAnimPlan(s).length) return '这个粒子系统还没有可导出的动画。';
     return '';
   }
 
@@ -16720,16 +16780,16 @@ window.addEventListener('unhandledrejection', function (event) {
     if (!dom.animList) return;
     var list = spineAnimPlan();
     var hint = animPlanHint();
-    var sig = list.map(function (o) { return o.key + '|' + o.name + '|' + (o.enabled ? 1 : 0); })
+    var sig = list.map(function (o) { return o.key + '|' + o.name; })
       .join('#') + '@' + hint + '@' + previewAnim + '@' + animRenaming;
     if (sig === animPreviewSig) return;
     animPreviewSig = sig;
 
-    /* 选中的那一段被关掉了：退回 idle（画布不能停在一段不存在的预览上，
-       时间是按它算的 —— 时间条长度就错了）。 */
+    /* 选中的那一段被关掉了（比如刚关掉「生成衔接动画」）：退回 idle ——
+       画布不能停在一段已经不存在的预览上，时间是按它算的，时间条长度就错了。 */
     var active = previewAnim || 'idle';
     var activeOk = false;
-    for (var q = 0; q < list.length; q++) if (list[q].key === active && list[q].enabled) activeOk = true;
+    for (var q = 0; q < list.length; q++) if (list[q].key === active) activeOk = true;
     if (!activeOk) setTimeout(function () { setPreviewAnim('idle'); }, 0);
 
     var box = dom.animList;
@@ -16740,14 +16800,7 @@ window.addEventListener('unhandledrejection', function (event) {
       row.setAttribute('data-anim-key', o.key);
       row.setAttribute('role', 'option');
       row.setAttribute('aria-selected', o.key === active ? 'true' : 'false');
-      if (!o.enabled) {
-        row.style.opacity = '.45';
-        row.setAttribute('data-anim-off', '1');
-        row.title = '这一段还没生成：' + (o.key === 'born'
-          ? '勾选「生成衔接动画」' : '勾选「生成结束衔接动画」');
-      } else {
-        row.title = '单击预览，双击改名';
-      }
+      row.title = '单击预览，双击改名';
       if (animRenaming === o.key) {
         /* 就地换成输入框：宽度和行一致，不会跳。 */
         var inp = document.createElement('input');
@@ -18345,7 +18398,7 @@ window.addEventListener('unhandledrejection', function (event) {
       dom.animList.addEventListener('click', function (event) {
         if (event.target.closest && event.target.closest('[data-anim-rename]')) return;
         var row = event.target.closest ? event.target.closest('[data-anim-key]') : null;
-        if (!row || row.getAttribute('data-anim-off') === '1') return;
+        if (!row) return;
         setPreviewAnim(row.getAttribute('data-anim-key'));
       });
       dom.animList.addEventListener('dblclick', function (event) {
@@ -18694,7 +18747,7 @@ window.addEventListener('unhandledrejection', function (event) {
   }
 
   window.__particleEditor = {
-    version: '1.0.0',
+    version: '1.1',
     enter: enter,
     leave: leave,
     getState: function () {
@@ -18716,7 +18769,16 @@ window.addEventListener('unhandledrejection', function (event) {
       };
     },
     setParam: function (path, value) {
+      /* 改「范围」时曲线要跟着缩放（见 rescaleLifeCurves），
+         所以和界面那条路一样先记旧范围、写完再重算。 */
+      var apiRange = /^life\.([a-zA-Z]+)\.(min|max)$/.exec(path);
+      var apiOldBox = null;
+      if (apiRange) {
+        var ar = lifeCfg(apiRange[1]);
+        if (ar) apiOldBox = lifeBounds(ar);
+      }
       pathSet(sys(), path, value);
+      if (apiOldBox && apiRange) rescaleLifeCurves(apiRange[1], apiOldBox[0], apiOldBox[1]);
       /* 颜色的 from / to 只是渐变首尾色标的镜像（见 colorStops），而 colorStops
          每次都会拿色标把这两个字段写回去。所以从 API 写进来时得落到色标上，
          否则下一次 colorStops() 就把刚写进去的值冲掉了（第二十八轮补的）。 */
