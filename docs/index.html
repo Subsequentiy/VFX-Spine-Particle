@@ -1903,6 +1903,44 @@ body.particle-active .sidebar { display: none !important; }
 /* 整行一颗按钮：宽度跟着上面几行输入框走 */
 .pt-export-spine { width: 100%; height: 27px; }
 
+/* 「将导出的动画」预览（2026-11-12 用户要求）。
+   三段的分工是固定的，所以这里不写成自由列表，而是按顺序排一排标签：
+   出生 → 循环 → 死亡，序号标在上面，一眼看得出是几段、各叫什么。
+   标签用等宽字体显示真实的动画名（name_intro / name_outro 那种），
+   因为用户要的是「导出后 Spine 里能看到什么」，不是给人看的说明。 */
+.pt-anim-preview { gap: 5px; }
+.pt-anim-preview-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px; margin-bottom: 1px;
+}
+.pt-anim-count {
+  font: 9.5px var(--mono); color: var(--accent);
+  flex: none; white-space: nowrap;
+}
+.pt-anim-chips { display: flex; flex-direction: column; gap: 3px; }
+.pt-anim-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 6px; border-radius: 4px;
+  background: #0c0e13; border: 1px solid var(--line-soft);
+  font-size: 10px; line-height: 1.35; min-width: 0;
+}
+.pt-anim-chip.is-main { border-color: rgba(139, 92, 246, .38); background: rgba(139, 92, 246, .1); }
+.pt-anim-role {
+  flex: none; width: 26px; font-size: 9px; color: var(--muted);
+  letter-spacing: .02em;
+}
+.pt-anim-chip.is-main .pt-anim-role { color: #c3b0ff; }
+.pt-anim-name {
+  flex: 1; min-width: 0; font: 10px var(--mono); color: #e6e0f1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pt-anim-chip.is-off .pt-anim-name { color: #5b5f69; }
+.pt-anim-len { flex: none; font: 9px var(--mono); color: var(--dim); }
+.pt-anim-chip.is-off .pt-anim-len { color: #494c55; }
+.pt-anim-hint {
+  font-size: 9px; line-height: 1.5; color: #6e7280; margin-top: 1px;
+}
+
 /* ---- body columns ---- */
 /* 左栏整列删掉（「对象属性」并进右栏），画布吃下让出来的宽度，
    右栏宽度不变。 */
@@ -3029,6 +3067,18 @@ body.particle-active .sidebar { display: none !important; }
                 maxlength="48" spellcheck="false" aria-label="动画名称"
                 title="导出到 Spine 里的动画名字；两个衔接动画自动叫「名称_intro」「名称_outro」。留空则用 idle">
             </span>
+          </div>
+          <!-- 将导出的动画（2026-11-12 用户要求：在 Spine 版本下面显示
+               「当前粒子系统的动画和有几个动画」）。三段的分工是固定的：
+               出生（从无到有）→ 循环（有了以后一圈一圈）→ 死亡（从有到无），
+               依次播就是一条完整的生命线。内容由 refreshAnimPreview() 填。 -->
+          <div class="pt-field full pt-anim-preview">
+            <div class="pt-anim-preview-head">
+              <span class="pt-label">将导出的动画</span>
+              <span class="pt-anim-count" id="pt-anim-count">1 个</span>
+            </div>
+            <div class="pt-anim-chips" id="pt-anim-chips"></div>
+            <div class="pt-anim-hint" id="pt-anim-hint" hidden></div>
           </div>
           <div class="pt-field full">
             <button class="pt-btn primary pt-export-spine" id="pt-export-spine" type="button"
@@ -15092,16 +15142,16 @@ window.addEventListener('unhandledrejection', function (event) {
       fNum('锥形角度', 'emitter.coneAngle', { step: 1, min: 0, max: 360, when: 'emitter.type=cone' }) +
       fNum('锥形旋转', 'emitter.rotation', { step: 1, when: 'emitter.type=cone' }) +
       fCheck('显示发射器形状', 'emitter.show', 'emitter.type=cone') +
-      fCheck('首尾循环', 'emission.seamless', 'emission.mode=stream') +
-      /* 这两个开关原来还带一个 offWhen=`emission.seamless=true`（没开首尾循环
-         就整行置灰、控件 disabled）。用户报的「开启后不会生效」就是它：点下去
-         既没有反应、也没有任何说明，勾选状态还一直是关的。
-         现在不再置灰 —— 点它就顺手把「首尾循环」一起打开（规则见
-         enforceEmissionRules），和「切到持续就自动开首尾循环」是同一个思路：
-         这两个动画本来就只能挂在首尾循环上，用户表达了意图就替他补上前置条件，
-         而不是让他先去上面开一个开关、再回来点一次。 */
-      fCheck('生成衔接动画', 'emission.intro', 'emission.mode=stream') +
-      fCheck('生成结束衔接动画', 'emission.outro', 'emission.mode=stream');
+      /* 首尾循环 / 两个衔接动画原来都带 `data-when="emission.mode=stream"`，
+         爆发模式下整行隐藏 —— 用户报「开启后不生效」的真正原因就在这里：
+         他的粒子是爆发发射，这三行压根没出现在界面上，自然无从开启。
+         现在三行常驻（爆发模式下也看得见），点任何一个都会把发射方式自动
+         切到「持续」并补上首尾循环（规则见 enforceEmissionRules）——
+         这两段衔接动画本来就只能挂在循环上，而循环只能挂在持续发射上。
+         与其让用户去找前置条件，不如让点击本身就把条件补齐。 */
+      fCheck('首尾循环', 'emission.seamless') +
+      fCheck('生成衔接动画', 'emission.intro') +
+      fCheck('生成结束衔接动画', 'emission.outro');
 
     var base =
       /* 外观与资源并进「基础属性」：贴图和混合模式只影响粒子画出来长什么样，
@@ -15262,6 +15312,9 @@ window.addEventListener('unhandledrejection', function (event) {
     updateVisibility();
     renderImages();
     drawLifeCanvases();
+    /* 导出设置里的「将导出的动画」：切系统、改发射方式、开关衔接动画、
+       改动画名称都会走到这里，列表跟着刷新。 */
+    refreshAnimPreview();
     /* 粒子面板里的滑块也是写死的 range：程序改完值（切系统 / 恢复默认）
        要顺手把轨道填充补上，否则滑块位置变了、高亮还停在旧比例。 */
     Array.prototype.forEach.call(document.querySelectorAll('#particle-view input[type="range"]'), function (r) {
@@ -15390,6 +15443,19 @@ window.addEventListener('unhandledrejection', function (event) {
   function enforceEmissionRules(path) {
     var s = sys();
     if (path === 'emission.mode' && s.emission.mode === 'stream') s.emission.seamless = true;
+    /* 「首尾循环」和两个衔接动画只对持续发射有意义（爆发是一次性的，没有周期可接）。
+       这三行现在在爆发模式下也常驻显示，用户点它们就是明确表达了「我要循环 / 我要
+       出生和死亡衔接」—— 这里直接把发射方式切到持续，而不是让点击落空。
+       （2026-11-12：用户反复报「生成衔接动画不生效」，根因就是爆发模式下这三行
+       整行隐藏，他找不到开关。见 buildPanels 里那三行 fCheck 的注释。）
+       只在「打开」时切：关掉的时候把 mode 也拉回持续是反的 —— 用户明明在关东西，
+       模式反而跳变一次。 */
+    if (path === 'emission.seamless' || path === 'emission.intro' || path === 'emission.outro') {
+      if (path === 'emission.seamless' ? s.emission.seamless
+          : (s.emission.intro || s.emission.outro)) {
+        s.emission.mode = 'stream';
+      }
+    }
     /* 打开任一个衔接动画就把「首尾循环」补上（2026-11-11）：这两个动画只能挂在
        首尾循环上，界面上原来是把整行置灰 —— 用户点了没反应，于是报「开启后
        不会生效」。这条规则让界面、API、预设三条路一致：只要意图成立，前置条件
@@ -15526,12 +15592,17 @@ window.addEventListener('unhandledrejection', function (event) {
       refreshTransport();
     }
     if (path === 'emission.seamless' || path === 'emission.intro' || path === 'emission.outro') {
-      /* 首尾循环也要刷：打开衔接动画时 enforceEmissionRules 会把它补成 true，
-         界面上那颗开关得跟着亮起来，用户才知道前置条件已经自动满足了。 */
-      syncPath('emission.seamless');
-      syncPath('emission.intro');
-      syncPath('emission.outro');
+      /* 这三条开关会互相牵连，而且可能把「发射方式」从爆发改成持续
+         （见 enforceEmissionRules），所以整块刷一遍控件：勾选状态、分段控件、
+         置灰状态都跟着对齐。syncControls 里有「正在输入的框不回写」的保护，
+         正在拖滑块 / 打数字时不会被打断。
+         发射方式一变，时间轴时长也跟着变（爆发 = 发射时刻 + 生命，
+         持续 = 循环周期），所以走带区必须重刷。 */
+      syncControls();
+      refreshTransport();
     }
+    /* 「将导出的动画」跟着发射方式 / 首尾循环 / 两个衔接开关走 */
+    if (/^emission\./.test(path)) refreshAnimPreview();
     /* 阻力 / 生命周期内速度互斥（见 enforceEmissionRules）：上面那条规则会把
        另一个开关在模型里改成 false，但界面上那个 checkbox 还是勾着的。
        这里只刷这两个开关，不走整体 syncControls —— 那会把正在输入的数字框
@@ -16488,6 +16559,91 @@ window.addEventListener('unhandledrejection', function (event) {
     'hasOwnProperty', 'isPrototypeOf', 'propertyIsEnumerable',
     'toLocaleString', 'toString', 'valueOf'
   ];
+
+  /* ------------------------------------------------------------------ */
+  /* 导出设置里的「将导出的动画」预览                                      */
+  /*                                                                    */
+  /* 2026-11-12 用户要求：在 Spine 版本下面显示「当前粒子系统的动画和有几个 */
+  /* 动画」。三段的分工是固定的一条生命线：                                */
+  /*   出生（从无到有）→ 循环（有了以后一圈一圈）→ 死亡（从有到无）        */
+  /* 判据必须和 buildOneSystem 里逐字一致，否则界面上说有、导出却没有 ——    */
+  /* 用户就是因为「点了开关看不出任何变化」才反复报这个问题的。              */
+  /* ------------------------------------------------------------------ */
+  function spineAnimPlan(s) {
+    s = s || sys();
+    var base = spineAnimName();
+    var stream = s.emission.mode === 'stream';
+    var seamless = stream && !!s.emission.seamless;
+    var period = loopPeriod(s);
+    var list = [];
+    if (stream && s.emission.intro) {
+      list.push({ role: '出生', name: base + '_intro', len: period, main: false });
+    }
+    list.push({
+      role: seamless ? '循环' : '单次', name: base,
+      len: seamless ? period : naturalDuration(s), main: true
+    });
+    if (stream && s.emission.outro) {
+      /* 死亡段的长度要烘焙完才知道（是「预热结束那一批里最年轻的粒子还剩多久」，
+         跟发射窗口、生命、周期三者都有关），这里算不准就不显示数字 ——
+         与其标一个「≤ 最长生命」让人以为要播 3 秒、实际只有 1 秒，
+         不如老老实实只列名字。 */
+      list.push({ role: '死亡', name: base + '_outro', len: null, main: false });
+    }
+    return list;
+  }
+
+  /* 没生成的那两段用一句提示补上，用户才知道开关在哪、为什么是灰的 */
+  function animPlanHint(s) {
+    s = s || sys();
+    if (s.emission.mode !== 'stream') {
+      return '当前是「爆发」发射，只有一段。切到「持续」才能加出生 / 死亡衔接动画。';
+    }
+    if (!s.emission.seamless) {
+      return '打开「首尾循环」才会带上出生 / 死亡衔接动画。';
+    }
+    if (!s.emission.intro || !s.emission.outro) {
+      return '勾选「生成衔接动画 / 生成结束衔接动画」可再加' +
+        (!s.emission.intro && !s.emission.outro ? '出生和死亡两段' :
+          (!s.emission.intro ? '出生一段' : '死亡一段')) + '。';
+    }
+    return '';
+  }
+
+  /* 只有内容真的变了才重建 DOM：这个函数会跟着每个输入事件跑，
+     每次拖滑块都重建一遍既浪费又会让滚动位置跳。 */
+  var animPreviewSig = null;
+  function refreshAnimPreview() {
+    if (!dom.animChips) return;
+    var list = spineAnimPlan();
+    var hint = animPlanHint();
+    var sig = list.map(function (o) { return o.role + '|' + o.name + '|' + o.len; }).join('#') + '@' + hint;
+    if (sig === animPreviewSig) return;
+    animPreviewSig = sig;
+
+    if (dom.animCount) dom.animCount.textContent = list.length + ' 个';
+    while (dom.animChips.firstChild) dom.animChips.removeChild(dom.animChips.firstChild);
+    list.forEach(function (o) {
+      var chip = document.createElement('div');
+      chip.className = 'pt-anim-chip' + (o.main ? ' is-main' : '');
+      var role = document.createElement('span');
+      role.className = 'pt-anim-role';
+      role.textContent = o.role;
+      var nm = document.createElement('span');
+      nm.className = 'pt-anim-name';
+      nm.textContent = o.name;
+      nm.title = o.name;
+      var len = document.createElement('span');
+      len.className = 'pt-anim-len';
+      len.textContent = o.len == null ? '' : o.len.toFixed(2) + 's';
+      chip.appendChild(role); chip.appendChild(nm); chip.appendChild(len);
+      dom.animChips.appendChild(chip);
+    });
+    if (dom.animHint) {
+      dom.animHint.textContent = hint;
+      dom.animHint.hidden = !hint;
+    }
+  }
 
   /* 精简容差：位移用世界单位，旋转用角度，缩放用倍率，颜色用 0-255 分量 */
   var SPINE_TOL_POS = 0.35;
@@ -17822,11 +17978,16 @@ window.addEventListener('unhandledrejection', function (event) {
        已经让出一拍，用户才看得到「正在烘焙 Spine…」。 */
     buildSpineBundle().then(function (bundle) {
       downloadBlob(new Blob([bundle.bytes], { type: 'application/json' }), bundle.name);
-      var extra = bundle.anims.length > 1 ? ' · ' + (bundle.anims.length - 1) + ' 段衔接动画' : '';
+      /* 把导出的动画名字逐个报出来（2026-11-12）：用户反复问「衔接动画到底生成了
+         没有」，只说「N 段衔接动画」他还是得去 Spine 里数。这里直接列名字，
+         和导出设置里那份「将导出的动画」对得上，一眼就能确认。 */
+      var animNote = bundle.anims.length > 1
+        ? ' · ' + bundle.anims.length + ' 段动画（' + bundle.anims.join(' / ') + '）'
+        : '';
       var curveNote = bundle.curves ? ' · ' + bundle.curves + ' 段曲线' : '';
       var sysNote = bundle.systems > 1 ? ' · ' + bundle.systems + ' 个系统' : '';
       status('已导出 ' + bundle.bones + ' 个粒子骨骼' + sysNote + ' · ' + bundle.version.label +
-        ' · ' + bundle.frames + ' 关键帧' + curveNote + extra +
+        ' · ' + bundle.frames + ' 关键帧' + curveNote + animNote +
         (bundle.dropped ? '（超上限丢弃 ' + bundle.dropped + ' 个）' : ''));
     }).catch(function (err) {
       console.error('[导出 Spine]', err);
@@ -17990,6 +18151,10 @@ window.addEventListener('unhandledrejection', function (event) {
       setPlaying(!playing);
     });
     if (dom.exportSpine) dom.exportSpine.addEventListener('click', exportSpine);
+    /* 「动画名称」是导出设置里唯一一个不走 data-path 的控件（导出时才按 id 读），
+       所以这里单独挂一个监听，让下面的动画预览跟着名字一起变。 */
+    var animNameEl = document.getElementById('pt-anim-name');
+    if (animNameEl) animNameEl.addEventListener('input', refreshAnimPreview);
     dom.scrub.addEventListener('input', function () {
       if (playing) setPlaying(false);
       /* 拖动 scrub 时 input 事件远密于一帧，合并到每帧一次 seek（见 seekCoalesced） */
@@ -18184,6 +18349,9 @@ window.addEventListener('unhandledrejection', function (event) {
     dom.hudRight = $('pt-hud-right');
     dom.play = $('pt-play');
     dom.exportSpine = $('pt-export-spine');
+    dom.animCount = $('pt-anim-count');
+    dom.animChips = $('pt-anim-chips');
+    dom.animHint = $('pt-anim-hint');
     dom.scrub = $('pt-scrub');
     dom.time = $('pt-time');
     dom.dope = $('pt-dope');
