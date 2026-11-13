@@ -16906,6 +16906,24 @@ window.addEventListener('unhandledrejection', function (event) {
   var SPINE_TOL_COLOR_REL = 0.02;
   var SPINE_TOL_COLOR_CAP = 8;
 
+  /* 位移也开一档「按自己变幅的百分比」（第四十五轮）。
+     用户开启随机重力后问「位置帧好多」。
+     查下来有两层原因：
+     ① 主因是 3.8 的格式限制 —— 3.8 一帧只能挂一条曲线，管住位移的 x 和 y
+        两个通道；而受了重力的粒子 x 是匀速（归一化后就是 u），y 是匀加速
+        （归一化后是抛物线），实测两者最大差 0.5375，换算到这条轨道上是
+        x 方向 138、y 方向 108 世界单位。一条曲线无论如何也贴不住两个形状，
+        贪心只好把跨度切碎、退成接近逐帧。同一份数据换 4.x 导出（每通道
+        一条曲线）帧数直接少 3~4 倍，实测 244 -> 59。
+     ② 次因才是容差量纲：0.35 是绝对世界单位，对一条跨度 256 单位的轨道
+        只有 0.14%，对跨度 10 单位的短轨道却等于 3.5%。量纲不对，长轨道被
+        多余的精度白白撑出一堆关键帧。
+     这里只治 ②（① 是格式死结，只能靠换 4.x 导出）。上限 3 世界单位是硬顶：
+     世界尺寸 512，3 单位 = 0.59%，粒子贴图本身有 34 单位，肉眼看不出来。
+     实测同一份 json：位移关键帧 87 -> 33，最大误差 2.93 世界单位。 */
+  var SPINE_TOL_POS_REL = 0.015;
+  var SPINE_TOL_POS_CAP = 3;
+
   /* 按这条轨道自己各通道的变幅算容差，地板是传进来的绝对容差 */
   function spineTrackTol(dense, prop, base, rel, cap) {
     var n = dense.length, c, i, out = [];
@@ -17850,7 +17868,10 @@ window.addEventListener('unhandledrejection', function (event) {
           });
           /* 位移 / 缩放抖动 0.002 以内、旋转在容差以内、颜色 8 位分量完全相同，
              都算「整条轨道不变」，压成一个关键帧写进静止姿态。 */
-          var posFit = spineFit(dense, 'pv', [SPINE_TOL_POS, SPINE_TOL_POS], [0.002, 0.002], null, ver.curveShared, 'auto');
+          /* 位移容差按这条轨道自己的变幅算（见 SPINE_TOL_POS_REL 的说明） */
+          var posTol = spineTrackTol(dense, 'pv', [SPINE_TOL_POS, SPINE_TOL_POS],
+            SPINE_TOL_POS_REL, SPINE_TOL_POS_CAP);
+          var posFit = spineFit(dense, 'pv', posTol, [0.002, 0.002], null, ver.curveShared, 'auto');
           var rotFit = spineFit(dense, 'rv', [SPINE_TOL_ROT], [SPINE_TOL_ROT], null, ver.curveShared, 'auto');
           var sclTol = spineTrackTol(dense, 'sv', [SPINE_TOL_SCALE, SPINE_TOL_SCALE],
             SPINE_TOL_SCALE_REL, SPINE_TOL_SCALE_CAP);
