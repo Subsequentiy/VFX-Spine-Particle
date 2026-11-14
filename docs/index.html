@@ -1918,13 +1918,24 @@ body.particle-active .sidebar { display: none !important; }
   color: #e8b98a;
 }
 .pt-project-row #pt-import-project:hover { border-color: #d99a63; color: #ffd7ae; }
-/* 录制那一行：分辨率下拉和上面「Spine 版本」同样占满中间一格 */
-#pt-export-group .pt-rec-row { grid-template-columns: 82px minmax(0, 1fr) 18px; }
-#pt-export-group .pt-rec-row > .pt-inline { width: 100%; margin-right: 0; }
-#pt-export-group .pt-rec-row .pt-select { width: 100%; }
+/* 工程组挪到右栏最上面（2026-11-14）：没有标题行，就是一块带内边距的卡片，
+   和下面的「对象属性」拉开一点距离。 */
+.pt-project-group { margin-bottom: 10px; }
+.pt-project-group .pt-fold-body { padding: 10px 12px; }
+/* 录制组（2026-11-14）：分辨率下拉和「Spine 版本」一样占满中间一格 */
+#pt-record-group .pt-export-row { grid-template-columns: 82px minmax(0, 1fr) 18px; }
+#pt-record-group .pt-export-row > .pt-inline { width: 100%; margin-right: 0; }
+#pt-record-group .pt-select { width: 100%; }
+.pt-inline-check { display: flex; align-items: center; }
+.pt-check { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #c9c7d2; cursor: pointer; }
+.pt-check input { margin: 0; }
 #pt-record-mp4 { width: 100%; height: 27px; }
 /* 录制按钮禁用态（录制中）：不要只靠颜色变淡，光标也换掉 */
 #pt-record-mp4:disabled { opacity: 0.5; cursor: progress; }
+/* 分辨率自动跟随背景图时，下拉置灰并给个说明 */
+#pt-rec-size:disabled { opacity: 0.6; cursor: not-allowed; }
+.pt-rec-hint { font-size: 10px; color: var(--dim); }
+.pt-rec-hint.is-on { color: #8fc7a0; }
 
 /* 「动画」这一行（2026-11-12 用户要求）。
    它取代了原来的「动画名称」输入框。三段动画全部常驻展开列成一竖排，
@@ -2628,7 +2639,7 @@ body.particle-active .sidebar { display: none !important; }
         </svg>
       </div>
       <div class="brand-copy">
-        <h1>VFX Spine Particle<span class="brand-ver" id="app-version">v1.2</span></h1>
+        <h1>VFX Spine Particle<span class="brand-ver" id="app-version">v1.3</span></h1>
       </div>
     </div>
     <div class="topbar-actions">
@@ -2756,7 +2767,7 @@ body.particle-active .sidebar { display: none !important; }
       <div class="sidebar-foot" id="sidebar-foot">
         <div class="foot-row" id="foot-row">
           <button class="text-btn" id="btn-reset" type="button">恢复默认参数</button>
-          <span class="version">v1.2</span>
+          <span class="version">v1.3</span>
         </div>
       </div>
     </aside>
@@ -3041,6 +3052,20 @@ body.particle-active .sidebar { display: none !important; }
     </div>
 
     <aside class="pt-col pt-right" id="pt-right">
+      <!-- 工程存取（2026-11-14 第五十轮）：用户要求「把导入数据 导出数据 左右排列
+           放到对象属性上面」。从「导出设置」里搬出来，单独占右栏最上面一块，
+           两颗按钮左右均分。放最上面是因为它作用的是**整个工程**（所有系统），
+           而对象属性只管当前系统、导出设置只管导出。 -->
+      <div class="pt-group pt-project-group" id="pt-project-group">
+        <div class="pt-fold-body">
+          <div class="pt-project-row">
+            <button class="pt-btn" id="pt-export-project" type="button"
+              title="把全部粒子系统的参数存成一个 .vfxproj.json 文件。不含贴图像素，只记文件名；下次导入后把同名图片拖回来即可还原">导出数据</button>
+            <button class="pt-btn" id="pt-import-project" type="button"
+              title="读取之前「导出数据」存下的 .vfxproj.json，整体替换当前工程（会清空现有粒子系统）">导入数据</button>
+          </div>
+        </div>
+      </div>
       <!-- 「对象属性」固定在右栏最上面，和下面的折叠组一起滚动。
            2026-11-03 第二十六轮：外壳换成 <details>、标题行换成 <summary>，
            和「发射模式 / 基础属性」一样点标题就能收起来（默认展开）。
@@ -3065,6 +3090,44 @@ body.particle-active .sidebar { display: none !important; }
         </details>
       </div>
       <div id="pt-panels"></div>
+      <!-- 录制视频（2026-11-14 第五十轮）：用户要求「录制 MP4 整个功能新增一个
+           UI 放到导出设置上面」。独立成组，不和「导出设置」混在一起 ——
+           那组是给 Spine 用的，这组是出视频的，语义不同。 -->
+      <details class="pt-group" id="pt-record-group" open>
+        <summary class="pt-group-head"><span class="pt-group-title">录制视频</span></summary>
+        <div class="pt-fold-body">
+          <div class="pt-fields">
+            <div class="pt-field pt-export-row">
+              <span class="pt-label">分辨率</span>
+              <span class="pt-inline">
+                <select class="pt-select" id="pt-rec-size" aria-label="录制分辨率"
+                  title="录出来的画面尺寸。有背景图时**自动跟背景图一致**（这一项会被钉住），保证底图和视频一样大；没有背景图时才按这里选的走">
+                  <option value="auto" selected>跟随背景图</option>
+                  <option value="512">512 × 512</option>
+                  <option value="768">768 × 768</option>
+                  <option value="1024">1024 × 1024</option>
+                  <option value="1920x1080">1920 × 1080</option>
+                </select>
+              </span>
+            </div>
+            <div class="pt-field pt-export-row">
+              <span class="pt-label">背景</span>
+              <span class="pt-inline pt-inline-check">
+                <label class="pt-check" title="打开时把导入的背景参考图一起录进视频；关掉就只录粒子。注意 H.264 没有透明通道，粒子之外的空白会录成黑色">
+                  <input type="checkbox" id="pt-rec-bg" checked> <span>录进视频</span>
+                </label>
+              </span>
+            </div>
+            <div class="pt-field full">
+              <button class="pt-btn primary" id="pt-record-mp4" type="button"
+                title="把当前选中的那一段动画录成 MP4（H.264）。逐帧渲染，不是抓屏：帧数固定、不掉帧，没有网格和手柄">录制 MP4</button>
+            </div>
+            <div class="pt-field full">
+              <div class="pt-rec-hint" id="pt-rec-hint">没有导入背景图</div>
+            </div>
+          </div>
+        </div>
+      </details>
       <!-- 导出设置（2026-11-03 第二十四轮）：一组和导出相关的设置。
            Spine 版本 / 动画名称 / 导出按钮原来散在标题栏，现在收进这一组。
            id 一律沿用（pt-spine-version / pt-export-spine），导出逻辑按 id 取值。 -->
@@ -3102,33 +3165,6 @@ body.particle-active .sidebar { display: none !important; }
           <div class="pt-field full">
             <button class="pt-btn primary pt-export-spine" id="pt-export-spine" type="button"
               title="把当前粒子系统烘焙成所选版本的 Spine 骨架，导出单个 json；把贴图按附件名放进同一目录后 Import Data 选这个 json 即可">导出 Spine</button>
-          </div>
-          <!-- 工程存取（2026-11-13）：和上面那颗「导出 Spine」区分开 ——
-               那颗导出的是给 Spine 用的骨架；这两颗存的是**工具自己的工程**，
-               下次打开这个 html 导入就能接着调。只存参数不存贴图。 -->
-          <div class="pt-field full pt-project-row">
-            <button class="pt-btn" id="pt-export-project" type="button"
-              title="把全部粒子系统的参数存成一个 .vfxproj.json 文件。不含贴图像素，只记文件名；下次导入后把同名图片拖回来即可还原">导出数据</button>
-            <button class="pt-btn" id="pt-import-project" type="button"
-              title="读取之前「导出数据」存下的 .vfxproj.json，整体替换当前工程（会清空现有粒子系统）">导入数据</button>
-          </div>
-          <!-- 录制 MP4（2026-11-13）：录的是右上角「动画」列表里当前选中的那一段，
-               走逐帧渲染 → WebCodecs 编 H.264 → 自带 muxer 封 mp4。
-               不是实时抓屏，所以帧数是确定的、不掉帧、和导出动画逐帧对齐。 -->
-          <div class="pt-field pt-export-row pt-rec-row">
-            <span class="pt-label">录制</span>
-            <span class="pt-inline">
-              <select class="pt-select" id="pt-rec-size" aria-label="录制分辨率"
-                title="录出来的视频边长（正方形）。世界是 512 见方，512 最不容易变形；768 / 1024 是放大录，边缘更锐但不含更多细节">
-                <option value="512" selected>512</option>
-                <option value="768">768</option>
-                <option value="1024">1024</option>
-              </select>
-            </span>
-          </div>
-          <div class="pt-field full">
-            <button class="pt-btn" id="pt-record-mp4" type="button"
-              title="把当前选中的那一段动画录成 MP4（H.264）。逐帧渲染，不是抓屏：帧数固定、不掉帧，画面里没有网格和手柄">录制 MP4</button>
           </div>
         </div>
         </div>
@@ -13929,12 +13965,15 @@ window.addEventListener('unhandledrejection', function (event) {
        background—— 画不画背景参考图（预览默认画）
        overlays  —— 画不画发射器图标 / 原点手柄（预览默认画）
        ignoreView—— 不套用当前的缩放 / 平移，固定成 1:1 居中（录制用）
-     后三项是给「录制视频」用的：录出来的画面里不该有网格、参考底图和
-     编辑手柄，那些都是对位用的辅助显示，不是特效本身；也不该跟着用户
-     刚才随手滚的滚轮缩放走 —— 同一份工程换个缩放就录出不一样大小，
-     那种「录出来变小了 / 跑偏了」的锅不该让用户背。
+       zoom      —— 指定取景缩放，压过 view.zoom 和上面那条默认算法（录制用）
+     后几项是给「录制视频」用的：录出来的画面里不该有网格和编辑手柄，那些
+     都是对位用的辅助显示，不是特效本身；也不该跟着用户刚才随手滚的滚轮缩放走
+     —— 同一份工程换个缩放就录出不一样大小，那种「录出来变小了 / 跑偏了」的锅
+     不该让用户背。
+     zoom 是给「录背景图」用的：要让底图正好铺满整帧，缩放得按「画面宽 / 图宽」
+     算（见 recFraming），而不是按世界尺寸算。
      默认值全按「画 / 用当前视图」走，所以原来的三个调用点行为一个字都没变。
-     （2026-11-13 加录制功能时补） */
+     （2026-11-13 加录制功能时补，2026-11-14 加 zoom） */
   function renderScene(ctx, W, H, opts) {
     opts = opts || {};
     var s = sys();
@@ -13943,7 +13982,9 @@ window.addEventListener('unhandledrejection', function (event) {
     ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, W, H);
 
-    var zoom = Math.min(W, H) / BASE_WORLD * 0.9 * (opts.ignoreView ? 1 : view.zoom);
+    var zoom = (opts.zoom != null)
+      ? opts.zoom
+      : (Math.min(W, H) / BASE_WORLD * 0.9 * (opts.ignoreView ? 1 : view.zoom));
     var cx = W / 2 + (opts.ignoreView ? 0 : view.panX);
     var cy = H / 2 + (opts.ignoreView ? 0 : view.panY);
 
@@ -17231,6 +17272,8 @@ window.addEventListener('unhandledrejection', function (event) {
       bgLayer.name = file.name || 'background';
       bgLayer.show = true;
       syncBgButtons();
+      /* 背景一挂上，录制分辨率就钉成背景尺寸（见 syncRecControls） */
+      syncRecControls();
       /* 大图按 1 图素 = 1 世界单位铺开会远超视口，导入后自动缩到看得全 */
       fitBackgroundView();
       draw();
@@ -17251,6 +17294,7 @@ window.addEventListener('unhandledrejection', function (event) {
     if (!bgLayer.img) return;
     bgLayer.show = !bgLayer.show;
     syncBgButtons();
+    syncRecControls();
     draw();
   }
 
@@ -17265,6 +17309,8 @@ window.addEventListener('unhandledrejection', function (event) {
     if (bgLayer.url) { try { URL.revokeObjectURL(bgLayer.url); } catch (e) { /* ignore */ } }
     bgLayer = { url: '', img: null, name: '', show: true };
     syncBgButtons();
+    /* 背景没了，录制分辨率回到下拉选的那一档 */
+    syncRecControls();
     draw();
     status('已清除背景图层' + (name ? '（' + name + '）' : ''));
   }
@@ -19294,6 +19340,16 @@ window.addEventListener('unhandledrejection', function (event) {
     /* 录制 MP4（2026-11-13）。取消是自愿的：录到一半点取消就把这一轮丢掉，
        不落文件 —— 半截视频比没有更让人困惑。 */
     if (dom.recordMp4) dom.recordMp4.addEventListener('click', function () { recordMp4(); });
+    /* 「录进视频」这颗勾选：用户手动动过一次就打上标记 ——
+       syncRecControls 只在「用户没表达过意见」时才默认勾上，
+       否则每次导入背景都会把用户特意关掉的勾重新打开。 */
+    if (dom.recBg) dom.recBg.addEventListener('change', function () {
+      dom.recBg.dataset.touched = '1';
+    });
+    /* 分辨率下拉：选了「跟随背景图」而在没有背景图时录制，会退到 512 —— 这属于
+       用户明确选择，不用额外提示。这里只负责把提示行刷新一下。 */
+    if (dom.recSize) dom.recSize.addEventListener('change', syncRecControls);
+    syncRecControls();
     var recCancelBtn = document.getElementById('pt-rec-cancel');
     if (recCancelBtn) recCancelBtn.addEventListener('click', function () {
       window.__ptRecCancel = true;
@@ -19532,6 +19588,8 @@ window.addEventListener('unhandledrejection', function (event) {
     dom.importProject = $('pt-import-project');
     dom.projectInput = $('pt-project-input');
     dom.recSize = $('pt-rec-size');
+    dom.recBg = $('pt-rec-bg');
+    dom.recHint = $('pt-rec-hint');
     dom.recordMp4 = $('pt-record-mp4');
     dom.animList = $('pt-anim-list');
     dom.animHint = $('pt-anim-hint');
@@ -19645,6 +19703,7 @@ window.addEventListener('unhandledrejection', function (event) {
     renderImages();
     syncControls();
     syncBgButtons();
+    syncRecControls();
     refreshAnimPreview();
     refreshTransport();
     /* seek 会把每个系统从 0 重新推演到 snap.time，
@@ -19680,14 +19739,85 @@ window.addEventListener('unhandledrejection', function (event) {
   /* 画面是干净的特效本体：不画网格、不画背景参考图、不画发射器手柄。      */
   /* ------------------------------------------------------------------ */
 
-  /* 录制分辨率。世界是 BASE_WORLD(512) 见方，所以录成正方形最不容易变形；
-     H.264 要求宽高都是偶数，512 天然满足。 */
+  /* 录制分辨率。世界是 BASE_WORLD(512) 见方，没有背景图时录成正方形最不容易变形；
+     H.264 要求宽高都是偶数，512 天然满足。
+     2026-11-14 第五十轮用户要求「录制分辨率要和导入的背景一样（背景 1920×1080
+     就录 1920×1080）」，所以有背景图时以背景图为准，见 recTargetSize()。 */
   var REC_SIZES = [512, 768, 1024];
   var REC_FPS = 30;               /* 和 SPINE_FPS 一致，录出来能直接和导出动画对帧 */
   var recBusy = false;
 
   function recSupported() {
     return !!(window.VideoEncoder && window.Mp4Muxer && window.Mp4Muxer.isSupported());
+  }
+
+  /* H.264 只接受偶数宽高（奇数会被编码器直接拒掉），统一向上取到偶数。 */
+  function recEven(n) {
+    n = Math.round(Number(n) || 0);
+    if (n < 2) return 2;
+    return n % 2 === 0 ? n : n + 1;
+  }
+
+  /* 这次要录多大。有背景图就用背景图的原尺寸 —— 见 recTargetSize 上面那段说明。 */
+  function recTargetSize() {
+    var img = bgLayer.img;
+    var nw = img ? (img.naturalWidth || img.width || 0) : 0;
+    var nh = img ? (img.naturalHeight || img.height || 0) : 0;
+    if (nw > 0 && nh > 0) {
+      return { w: recEven(nw), h: recEven(nh), from: 'bg', nw: nw, nh: nh };
+    }
+    var v = dom.recSize ? String(dom.recSize.value || '') : '512';
+    if (v === 'auto') v = '512';
+    if (v.indexOf('x') > 0) {
+      var parts = v.split('x');
+      return { w: recEven(parts[0]), h: recEven(parts[1]), from: 'preset' };
+    }
+    var s = Number(v);
+    if (REC_SIZES.indexOf(s) < 0) s = 512;
+    return { w: s, h: s, from: 'preset' };
+  }
+
+  /* 背景图在录制里怎么放。
+     drawBackground 的约定是「1 图素 = 1 世界单位」，画在画面正中、尺寸 = 图素 × zoom。
+     所以想让底图**正好铺满**整帧，zoom 必须是 W / 图宽（= H / 图高，因为 W/H 就是按它
+     的宽高比来的；万一两者对不上，取较大的那个，宁可裁掉一点也不要留黑边）。
+     这就是录制的取景缩放，和用户在画布里滚了多少滚轮无关。 */
+  function recFraming(w, h, size) {
+    if (!size || size.nw <= 0 || size.nh <= 0) return Math.min(w, h) / BASE_WORLD * 0.9;
+    return Math.max(w / size.nw, h / size.nh);
+  }
+
+  /* 录制组那两行控件的状态（2026-11-14）。
+     有背景图时分辨率是**钉死**的（用户要求「录制分辨率要和导入的背景一样」），
+     所以把下拉置灰、显示「跟随背景图」并把实际尺寸写在下面那行提示里 ——
+     光置灰不说明原因，用户会以为界面坏了。 */
+  function syncRecControls() {
+    if (!dom.recSize) return;
+    var img = bgLayer.img;
+    var hasBg = !!(img && (img.naturalWidth || img.width));
+    if (hasBg) {
+      dom.recSize.value = 'auto';
+      dom.recSize.disabled = true;
+    } else {
+      dom.recSize.disabled = false;
+      if (dom.recSize.value === 'auto') dom.recSize.value = '512';
+    }
+    if (dom.recBg) {
+      dom.recBg.disabled = !hasBg;
+      if (!hasBg) dom.recBg.checked = false;
+      else if (!dom.recBg.dataset.touched) dom.recBg.checked = true;
+    }
+    if (dom.recHint) {
+      var t = recTargetSize();
+      if (hasBg) {
+        dom.recHint.textContent = '分辨率跟随背景图：' + t.w + ' × ' + t.h +
+          (bgLayer.name ? '（' + bgLayer.name + '）' : '');
+        dom.recHint.className = 'pt-rec-hint is-on';
+      } else {
+        dom.recHint.textContent = '没有导入背景图，按左边选的尺寸录制';
+        dom.recHint.className = 'pt-rec-hint';
+      }
+    }
   }
 
   /* 挑一个当前浏览器真能编的 H.264 档位。
@@ -19746,8 +19876,12 @@ window.addEventListener('unhandledrejection', function (event) {
       status('这个浏览器不支持 WebCodecs 录制（需要 Chrome / Edge 且支持 H.264 编码）', 9000, true);
       return;
     }
-    var size = Number(dom.recSize && dom.recSize.value) || 512;
-    if (REC_SIZES.indexOf(size) < 0) size = 512;
+    /* 这次的尺寸 / 是否录背景（2026-11-14 第五十轮）：
+       - 有背景图 → 分辨率**强制**跟背景图一样（用户要求），并默认把背景录进去；
+       - 没背景图 → 按「分辨率」下拉，且没有背景可录。
+       注意：勾选框只管「录不录背景」，改不了分辨率 —— 用户明确要求两者一致。 */
+    var size = recTargetSize();
+    var withBg = !!(bgLayer.img && dom.recBg && dom.recBg.checked);
 
     var savedTime = time;
     var wasPlaying = playing;
@@ -19762,8 +19896,8 @@ window.addEventListener('unhandledrejection', function (event) {
     baking = true;
 
     try {
-      var cfg = await recPickConfig(size, size);
-      if (!cfg) throw new Error('这个浏览器没有可用的 H.264 编码档位');
+      var cfg = await recPickConfig(size.w, size.h);
+      if (!cfg) throw new Error('这个浏览器没有可用的 H.264 编码档位（' + size.w + '×' + size.h + '）');
 
       /* 录多长：跟着「动画」里选中的那一段。idle 时用整条时间轴（duration()），
          因为多系统时时间轴取的是最长的那个，和眼睛看到的预览长度一致；
@@ -19773,11 +19907,11 @@ window.addEventListener('unhandledrejection', function (event) {
 
       /* 离屏画布：不动用户正在看的那个 canvas，录完也不用还原它的尺寸 */
       var cv = document.createElement('canvas');
-      cv.width = size;
-      cv.height = size;
+      cv.width = size.w;
+      cv.height = size.h;
       var rctx = cv.getContext('2d', { alpha: false });
 
-      var muxer = new window.Mp4Muxer({ width: size, height: size, fps: REC_FPS });
+      var muxer = new window.Mp4Muxer({ width: size.w, height: size.h, fps: REC_FPS });
       var descSet = false;
       var encErr = null;
       var seen = 0;
@@ -19802,13 +19936,23 @@ window.addEventListener('unhandledrejection', function (event) {
          循环从稳态、死亡从停掉发射往下走），见 stepOne。 */
       for (var si = 0; si < sims.length; si++) { sims[si].dirty = true; sims[si].dieMode = false; }
 
+      /* 取景缩放：录背景时按「画面宽 / 图宽」算，让底图正好铺满整帧；
+         不录背景时用世界尺寸那套（0.9 留边）—— 两种都和用户的缩放无关。 */
+      var recZoom = withBg ? recFraming(size.w, size.h, size) : null;
+
       /* 逐帧：t = f / REC_FPS，先 seek 到位再渲染。
          seek 会走 stepTo → advanceTo，和播放 / 导出同一条路。 */
       for (var f = 0; f < frameCount; f++) {
         if (encErr) throw encErr;
         if (recCancelRequested()) throw new Error('__cancelled__');
         seek(f / REC_FPS);
-        renderScene(rctx, size, size, { grid: false, background: false, overlays: false, ignoreView: true });
+        renderScene(rctx, size.w, size.h, {
+          grid: false,
+          background: withBg,          /* 第五十轮：默认把导入的背景录进去 */
+          overlays: false,
+          ignoreView: true,
+          zoom: recZoom
+        });
         var vf = new VideoFrame(cv, {
           timestamp: Math.round(f * 1e6 / REC_FPS),
           duration: Math.round(1e6 / REC_FPS)
@@ -19834,7 +19978,8 @@ window.addEventListener('unhandledrejection', function (event) {
       if (!seen) throw new Error('没有编出任何帧');
 
       var bytes = muxer.build();
-      var fname = safeFileName(sys().name, 'particle') + '_' + segName + '_' + size + 'p.mp4';
+      var fname = safeFileName(sys().name, 'particle') + '_' + segName + '_' +
+        size.w + 'x' + size.h + '.mp4';
       var blob = new Blob([bytes], { type: 'video/mp4' });
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
@@ -19846,6 +19991,7 @@ window.addEventListener('unhandledrejection', function (event) {
       setTimeout(function () { URL.revokeObjectURL(url); }, 6000);
 
       status('已录制 ' + fname + ' · ' + frameCount + ' 帧 / ' + REC_FPS + 'fps · ' +
+        size.w + '×' + size.h + (withBg ? ' · 含背景' : '') + ' · ' +
         (bytes.length / 1048576).toFixed(2) + ' MB', 9000);
     } catch (err) {
       if (err && err.message === '__cancelled__') {
@@ -19871,7 +20017,7 @@ window.addEventListener('unhandledrejection', function (event) {
   }
 
   window.__particleEditor = {
-    version: '1.2',
+    version: '1.3',
     enter: enter,
     leave: leave,
     getState: function () {
