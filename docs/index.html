@@ -2670,7 +2670,7 @@ body.particle-active .sidebar { display: none !important; }
         </svg>
       </div>
       <div class="brand-copy">
-        <h1>VFX Spine Particle<span class="brand-ver" id="app-version">v1.5</span></h1>
+        <h1>VFX Spine Particle<span class="brand-ver" id="app-version">v1.6</span></h1>
       </div>
     </div>
     <div class="topbar-actions">
@@ -2798,7 +2798,7 @@ body.particle-active .sidebar { display: none !important; }
       <div class="sidebar-foot" id="sidebar-foot">
         <div class="foot-row" id="foot-row">
           <button class="text-btn" id="btn-reset" type="button">恢复默认参数</button>
-          <span class="version">v1.5</span>
+          <span class="version">v1.6</span>
         </div>
       </div>
     </aside>
@@ -6956,6 +6956,14 @@ window.addEventListener('unhandledrejection', function (event) {
     var has = count > 0;
     if (frames.index >= count) frames.index = Math.max(0, count - 1);
     el.framesScrub.value = String(has ? frames.index : 0);
+    /* 轨道那条已填充高亮（CSS 变量 --fill）跟着一起走。
+       全局的 tickRangeFills 每帧比对一次 value，理论上能兜住这里；
+       但它是挂在 requestAnimationFrame 上的 —— 标签页在后台、或者
+       环境把 rAF 限流到 1fps 时，滑块头已经到位置、填充色还停在上一格。
+       这一步只是把「本帧必须一致」的东西当场写掉，代价一条属性。
+       （2026-11-14。注意这里只能用本 script 块里的 setRangeFill，
+       后面那个 fillRange 定义在另一个 script 块，这里看不到。） */
+    setRangeFill(el.framesScrub);
     el.framesCounter.textContent = (has ? frames.index + 1 : 0) + ' / ' + count;
     el.framesHud.textContent = has
       ? (frames.fullWidth + '×' + frames.fullHeight + ' · ' + frames.fps + ' FPS · ' +
@@ -13133,16 +13141,22 @@ window.addEventListener('unhandledrejection', function (event) {
     var imgIdx = pickImage(rng);
     var baseSize = GLOW_SIZE;
     /* 贴图不能直接压进正方形：基准尺寸取长边，另一条边按原始长宽比缩，
-       否则 1295×453 这种长条火焰会被横向压扁、变成又窄又高的一团。 */
+       否则 1295×453 这种长条火焰会被横向压扁、变成又窄又高的一团。
+       工程刚导入时清单里有名字、`img` 还是 null（像素要等用户重新拖图才认回来），
+       这时不能直接读 naturalWidth —— 会抛异常把整轮发射打断，
+       所以退回白方块的等比（1:1）。 */
     var aw = 1, ah = 1;
     if (imgIdx >= 0) {
       var im = s.appearance.images[imgIdx];
-      var nw = im.img.naturalWidth || 1;
-      var nh = im.img.naturalHeight || 1;
-      var m = Math.max(nw, nh);
-      baseSize = Math.max(1, m * (Number(im.scale) || 1));
-      aw = nw / m;
-      ah = nh / m;
+      var texel = im && im.img;
+      if (texel) {
+        var nw = texel.naturalWidth || texel.width || 1;
+        var nh = texel.naturalHeight || texel.height || 1;
+        var m = Math.max(nw, nh);
+        baseSize = Math.max(1, m * (Number(im.scale) || 1));
+        aw = nw / m;
+        ah = nh / m;
+      }
     }
 
     var a = rad(em.ang);
@@ -13752,17 +13766,28 @@ window.addEventListener('unhandledrejection', function (event) {
     color = quantizeSpriteColor(color || '#ffffff');
     if (p.img < 0 || !s.appearance.images[p.img]) {
       /* 没有贴图 → 默认白方块。缓存键沿用导出的区域名 glow */
-      var gk = 'glow|' + color;
-      if (!spriteCache[gk]) spriteCacheSet(gk, tint(defaultSpriteSource(), color));
-      return spriteCache[gk];
+      return glowSprite(color);
     }
     var img = s.appearance.images[p.img];
     var key = img.id + '|' + color;
     if (!spriteCache[key]) {
       var tex = textureOf(img);
-      if (tex) spriteCacheSet(key, tint(tex, color));
+      /* 像素还没到（导入工程后 url 为空 / 图片还没解码完）→ 这一帧退回白方块。
+         不能像以前那样直接返 undefined：调用点 `if (!spr) continue` 会把整帧的
+         粒子全跳过，画面上一颗粒子都看不见。 */
+      if (!tex) return glowSprite(color);
+      spriteCacheSet(key, tint(tex, color));
     }
     return spriteCache[key];
+  }
+
+  /* 默认白方块（没有贴图 / 贴图像素还没到位时用它顶上）。
+     单独抽出来是因为 spriteFor 现在有两处要退回白块，两处的缓存键必须同一个，
+     否则同一颗颜色会被 tint 两次、占两份缓存。 */
+  function glowSprite(color) {
+    var gk = 'glow|' + color;
+    if (!spriteCache[gk]) spriteCacheSet(gk, tint(defaultSpriteSource(), color));
+    return spriteCache[gk];
   }
 
   /* 画布的设备像素比 + 世界单位换算成屏幕像素的比例。
@@ -18702,12 +18727,16 @@ window.addEventListener('unhandledrejection', function (event) {
         if (ims[i].id === id) { im = ims[i]; break; }
       }
     }
-    if (!im) return null;
+    if (!im) return { base: GLOW_SIZE, w: GLOW_SIZE, h: GLOW_SIZE, name: 'glow', src: '' };
     var tex = textureOf(im) || im.img;
-    if (!tex) return null;
+    /* 像素还没到位（导入工程后只剩名字，要等用户重新拖同名图认回来）：
+       退回内建白块，和画布上 spriteFor 的处理保持一致。
+       以前这里返 null，整条轨道就被跳过；结果是「画布上看得见粒子、
+       导出却报『时间轴里没有粒子』」—— 两边说法对不上。 */
+    if (!tex) return { base: GLOW_SIZE, w: GLOW_SIZE, h: GLOW_SIZE, name: 'glow', src: '' };
     var w = tex.naturalWidth || tex.width || 0;
     var h = tex.naturalHeight || tex.height || 0;
-    if (!w || !h) return null;
+    if (!w || !h) return { base: GLOW_SIZE, w: GLOW_SIZE, h: GLOW_SIZE, name: 'glow', src: '' };
     /* src 是这张图的真实身份：同一份 objectURL（含「复制系统」后的共享）
        才认成同一张图。光靠「名字 + 尺寸 + 基准尺寸」判重会把两张同名同尺寸
        但内容不同的图合成一张 png，其中一个系统就贴错图了。 */
@@ -20091,7 +20120,7 @@ window.addEventListener('unhandledrejection', function (event) {
   }
 
   window.__particleEditor = {
-    version: '1.5',
+    version: '1.6',
     enter: enter,
     leave: leave,
     getState: function () {
