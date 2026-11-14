@@ -14206,6 +14206,28 @@ window.addEventListener('unhandledrejection', function (event) {
       ctx.fillStyle = col;
       dopeRoundRect(ctx, bx, by, bwe, bh2, 3);
       ctx.fill();
+      /* 已播放进度（2026-11-14 第五十轮，用户第三次报「进度条卡住」）。
+         上面那条实心色块画的是**发射区间** —— 由发射起止决定，跟播放到哪儿
+         毫无关系，所以整段播放下来一动不动。用户看到的「不会动的进度条」
+         就是它，他答的「滑块头不动」也是这个意思。
+         这里再叠一层「区间起点 → 播放头」的提亮，让它真的能看出播放进度。
+         用 lighter 混合而不是盖一层半透明色块：实心段和淡色尾巴段的底色不同，
+         盖色块会把两者压成同一个色调，分不出「发射中」和「只剩尾巴」了；
+         lighter 是在原色上做加法，两段的明暗差保留，同时都能看出走到哪儿。 */
+      var headF = clamp(time, 0, duration()) * SPINE_FPS;
+      if (headF > f0 && f2 > f0) {
+        var pw = Math.min(fx(headF), fx(f2)) - bx;
+        if (pw > 0.5) {
+          ctx.save();
+          dopeRoundRect(ctx, bx, by, Math.max(1, fx(f2) - bx), bh2, 3);
+          ctx.clip();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = col;
+          ctx.globalAlpha = 0.34;
+          ctx.fillRect(bx, by, pw, bh2);
+          ctx.restore();
+        }
+      }
       if (i === current) {
         ctx.strokeStyle = 'rgba(255,255,255,.5)';
         dopeRoundRect(ctx, bx, by, bwe, bh2, 3);
@@ -14213,20 +14235,30 @@ window.addEventListener('unhandledrejection', function (event) {
       }
     });
 
-    /* 播放头 */
+    /* 播放头：先描一道深色，再压一道亮红 —— 底下是彩色色块时，
+       单根 1px 红线会被色块吃掉，看着像根本没有播放头（用户第三次
+       报「进度条卡住」时，图上就是找不到它）。5px 三角也比 8px 更显眼。 */
     var px = Math.round(fx(clamp(time, 0, duration()) * SPINE_FPS)) + .5;
-    ctx.strokeStyle = '#ff8a8a';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0,0,0,.55)';
     ctx.beginPath();
     ctx.moveTo(px, 0);
     ctx.lineTo(px, h);
     ctx.stroke();
-    ctx.fillStyle = '#ff8a8a';
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#ff9d9d';
     ctx.beginPath();
-    ctx.moveTo(px - 4, 0);
-    ctx.lineTo(px + 4, 0);
-    ctx.lineTo(px, 6);
+    ctx.moveTo(px, 0);
+    ctx.lineTo(px, h);
+    ctx.stroke();
+    ctx.fillStyle = '#ff9d9d';
+    ctx.beginPath();
+    ctx.moveTo(px - 5, 0);
+    ctx.lineTo(px + 5, 0);
+    ctx.lineTo(px, 8);
     ctx.closePath();
     ctx.fill();
+    ctx.lineWidth = 1;
   }
 
   function dopeSignature() {
