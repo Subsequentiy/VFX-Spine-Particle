@@ -1922,20 +1922,15 @@ body.particle-active .sidebar { display: none !important; }
    和下面的「对象属性」拉开一点距离。 */
 .pt-project-group { margin-bottom: 10px; }
 .pt-project-group .pt-fold-body { padding: 10px 12px; }
-/* 录制组（2026-11-14）：分辨率下拉和「Spine 版本」一样占满中间一格 */
+/* 录制组（2026-11-14）：分辨率是「宽 × 高」两个数字框，中间一个小叉 */
 #pt-record-group .pt-export-row { grid-template-columns: 82px minmax(0, 1fr) 18px; }
 #pt-record-group .pt-export-row > .pt-inline { width: 100%; margin-right: 0; }
-#pt-record-group .pt-select { width: 100%; }
-.pt-inline-check { display: flex; align-items: center; }
-.pt-check { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #c9c7d2; cursor: pointer; }
-.pt-check input { margin: 0; }
+.pt-res-inline { display: flex; align-items: center; gap: 6px; }
+.pt-res-inline .pt-num { width: 100%; min-width: 0; }
+.pt-res-x { color: var(--dim); font: 11px var(--mono); flex: 0 0 auto; }
 #pt-record-mp4 { width: 100%; height: 27px; }
 /* 录制按钮禁用态（录制中）：不要只靠颜色变淡，光标也换掉 */
 #pt-record-mp4:disabled { opacity: 0.5; cursor: progress; }
-/* 分辨率自动跟随背景图时，下拉置灰并给个说明 */
-#pt-rec-size:disabled { opacity: 0.6; cursor: not-allowed; }
-.pt-rec-hint { font-size: 10px; color: var(--dim); }
-.pt-rec-hint.is-on { color: #8fc7a0; }
 
 /* 「动画」这一行（2026-11-12 用户要求）。
    它取代了原来的「动画名称」输入框。三段动画全部常驻展开列成一竖排，
@@ -2639,7 +2634,7 @@ body.particle-active .sidebar { display: none !important; }
         </svg>
       </div>
       <div class="brand-copy">
-        <h1>VFX Spine Particle<span class="brand-ver" id="app-version">v1.3</span></h1>
+        <h1>VFX Spine Particle<span class="brand-ver" id="app-version">v1.4</span></h1>
       </div>
     </div>
     <div class="topbar-actions">
@@ -2767,7 +2762,7 @@ body.particle-active .sidebar { display: none !important; }
       <div class="sidebar-foot" id="sidebar-foot">
         <div class="foot-row" id="foot-row">
           <button class="text-btn" id="btn-reset" type="button">恢复默认参数</button>
-          <span class="version">v1.3</span>
+          <span class="version">v1.4</span>
         </div>
       </div>
     </aside>
@@ -3059,10 +3054,10 @@ body.particle-active .sidebar { display: none !important; }
       <div class="pt-group pt-project-group" id="pt-project-group">
         <div class="pt-fold-body">
           <div class="pt-project-row">
-            <button class="pt-btn" id="pt-export-project" type="button"
-              title="把全部粒子系统的参数存成一个 .vfxproj.json 文件。不含贴图像素，只记文件名；下次导入后把同名图片拖回来即可还原">导出数据</button>
             <button class="pt-btn" id="pt-import-project" type="button"
               title="读取之前「导出数据」存下的 .vfxproj.json，整体替换当前工程（会清空现有粒子系统）">导入数据</button>
+            <button class="pt-btn" id="pt-export-project" type="button"
+              title="把全部粒子系统的参数存成一个 .vfxproj.json 文件。不含贴图像素，只记文件名；下次导入后把同名图片拖回来即可还原">导出数据</button>
           </div>
         </div>
       </div>
@@ -3092,38 +3087,29 @@ body.particle-active .sidebar { display: none !important; }
       <div id="pt-panels"></div>
       <!-- 录制视频（2026-11-14 第五十轮）：用户要求「录制 MP4 整个功能新增一个
            UI 放到导出设置上面」。独立成组，不和「导出设置」混在一起 ——
-           那组是给 Spine 用的，这组是出视频的，语义不同。 -->
+           那组是给 Spine 用的，这组是出视频的，语义不同。
+           第五十一轮按用户要求瘦身：删掉「背景：录进视频」勾选（有背景就一直录）、
+           删掉那行提示文字（没有背景时按选的尺寸录）—— 界面上只留分辨率和按钮。 -->
       <details class="pt-group" id="pt-record-group" open>
         <summary class="pt-group-head"><span class="pt-group-title">录制视频</span></summary>
         <div class="pt-fold-body">
           <div class="pt-fields">
             <div class="pt-field pt-export-row">
               <span class="pt-label">分辨率</span>
-              <span class="pt-inline">
-                <select class="pt-select" id="pt-rec-size" aria-label="录制分辨率"
-                  title="录出来的画面尺寸。有背景图时**自动跟背景图一致**（这一项会被钉住），保证底图和视频一样大；没有背景图时才按这里选的走">
-                  <option value="auto" selected>跟随背景图</option>
-                  <option value="512">512 × 512</option>
-                  <option value="768">768 × 768</option>
-                  <option value="1024">1024 × 1024</option>
-                  <option value="1920x1080">1920 × 1080</option>
-                </select>
-              </span>
-            </div>
-            <div class="pt-field pt-export-row">
-              <span class="pt-label">背景</span>
-              <span class="pt-inline pt-inline-check">
-                <label class="pt-check" title="打开时把导入的背景参考图一起录进视频；关掉就只录粒子。注意 H.264 没有透明通道，粒子之外的空白会录成黑色">
-                  <input type="checkbox" id="pt-rec-bg" checked> <span>录进视频</span>
-                </label>
+              <span class="pt-inline pt-res-inline">
+                <!-- 第五十一轮用户要求「默认跟随背景图但也支持修改（增加可手动输入）」：
+                     两个数字框替代原来的下拉。导入背景时自动填上背景图的宽高
+                     （用户没手动改过的话），改过就一直按用户填的录。 -->
+                <input class="pt-num" type="number" id="pt-rec-w" min="2" max="4096" step="2"
+                  value="512" aria-label="录制宽度" title="视频宽度（像素）。导入背景图时自动填背景图宽度，可手动改；H.264 只接受偶数，奇数会向上取偶">
+                <span class="pt-res-x">×</span>
+                <input class="pt-num" type="number" id="pt-rec-h" min="2" max="4096" step="2"
+                  value="512" aria-label="录制高度" title="视频高度（像素）。导入背景图时自动填背景图高度，可手动改；H.264 只接受偶数，奇数会向上取偶">
               </span>
             </div>
             <div class="pt-field full">
               <button class="pt-btn primary" id="pt-record-mp4" type="button"
-                title="把当前选中的那一段动画录成 MP4（H.264）。逐帧渲染，不是抓屏：帧数固定、不掉帧，没有网格和手柄">录制 MP4</button>
-            </div>
-            <div class="pt-field full">
-              <div class="pt-rec-hint" id="pt-rec-hint">没有导入背景图</div>
+                title="把当前选中的那一段动画录成 MP4。逐帧渲染，不是抓屏：帧数固定、不掉帧，没有网格和手柄">录制 MP4</button>
             </div>
           </div>
         </div>
@@ -12460,7 +12446,19 @@ window.addEventListener('unhandledrejection', function (event) {
           strengthMax: 500,
           angle: 0
         },
-        noise: { enabled: false, strength: 30, scale: 100, speed: 1 }
+        /* 噪波（2026-11-14 第五十二轮，用户要求「噪波强度支持随机」）：
+           和重力 / 风一样加一个随机强度的区间。随机权重同样沿用
+           p.gravRand，不额外抽随机数 —— 多抽一个会把整条随机序列往后挪，
+           每个已经调好的效果都会被悄悄重新洗一次牌（见 spawn 里 spinRand 的注释）。 */
+        noise: {
+          enabled: false,
+          strengthMode: 'fixed',
+          strength: 30,
+          strengthMin: 20,
+          strengthMax: 80,
+          scale: 100,
+          speed: 1
+        }
       },
       timeline: { duration: 2 }
     };
@@ -13246,7 +13244,15 @@ window.addEventListener('unhandledrejection', function (event) {
       if (mNoise.enabled) {
         var ns = Math.max(1, Number(mNoise.scale) || 100);
         var nsp = Number(mNoise.speed) || 1;
-        var strg = (Number(mNoise.strength) || 0) * NOISE_GAIN;
+        /* 噪波强度（2026-11-14 第五十二轮）：固定 / 随机两种模式，
+           和重力、风一致。随机权重沿用 p.gravRand，不额外抽随机数、
+           不改动已有的随机序列。每颗粒子各取一个强度，所以同一团里
+           有的窜得猛、有的几乎不动，看着才像噪波而不是整体平移。 */
+        var nMode = mNoise.strengthMode || 'fixed';
+        var nFixed = (Number(mNoise.strength) || 0) * NOISE_GAIN;
+        var nMin = (Number(mNoise.strengthMin) || 0) * NOISE_GAIN;
+        var nMax = (Number(mNoise.strengthMax) || 0) * NOISE_GAIN;
+        var nRand = nMode === 'random';
         /* 每颗粒子带一个固定的随机相位。噪波如果只按世界坐标采样，挨在一起
            的两颗会读到几乎同一个值，结果是整团一起平移 —— 看上去就是
            「强度拉到 100 也没什么噪波」。加了相位之后每颗粒子采到的是噪声场
@@ -13255,6 +13261,9 @@ window.addEventListener('unhandledrejection', function (event) {
         var npx = Number(p.nx) || 0;
         var npy = Number(p.ny) || 0;
         var nt = now * nsp;
+        var strg = nRand
+          ? lerp(nMin, nMax, p.gravRand == null ? 0.5 : p.gravRand)
+          : nFixed;
         ax += noise2(p.x / ns + npx + nt, p.y / ns + npy) * strg;
         ay += noise2(p.x / ns + npx + 37.7 + nt * 0.7, p.y / ns + npy + 53.1) * strg;
       }
@@ -14174,10 +14183,29 @@ window.addEventListener('unhandledrejection', function (event) {
       ctx.moveTo(tx, DOPE_RULER - 5);
       ctx.lineTo(tx, DOPE_RULER);
       ctx.stroke();
-      ctx.fillText(String(f), tx + 3, DOPE_RULER / 2 - 1);
+      /* 标签默认画在刻度右边（tx + 3）。最后一个刻度的 tx 已经贴着画布右边缘
+         （w = ppf·n + 10，fx(n) = w - 5），再往右画整段数字就被裁掉了 ——
+         用户截图里那个红框就是被压住的末位数字（2026-11-14 第五十二轮）。
+         所以放不下时改成右对齐，画在刻度左边。 */
+      var label = String(f);
+      var tw = ctx.measureText(label).width;
+      var lx = tx + 3;
+      if (lx + tw > w - 2) lx = tx - 3 - tw;
+      if (lx < 1) lx = 1;
+      ctx.fillText(label, lx, DOPE_RULER / 2 - 1);
     }
 
-    /* 一行一个系统：实心条 = 发射区间，淡色条 = 粒子的尾巴（发射结束 → 全部消失） */
+    /* 一行一个系统。
+       2026-11-14 第五十二轮按用户要求改了：
+       原来画的是「实心块 = 发射区间 + 淡色块 = 粒子尾巴」，而这两块的横向位置
+       只由发射时刻 / 时长 / 生命长度决定，跟播放到哪儿无关 —— 爆发模式下实心块
+       只有 1 帧宽，就是用户反复问「这个到底是干啥的、为啥不动」的那颗小色块。
+       现在把小色块删掉，整行改成一根**真正会走的进度条**：
+         · 底部 2px 细线 = 这个系统的粒子存活窗口（发射起点 → 全部消失），
+           只是参考线，不再是「条」的形状，不会被误认成进度；
+         · 窗口内从起点填到播放头 = 播放进度，播放时从左往右长；
+         · 发射结束位置（f1）留一根 1px 短刻度，把「什么时候停止发射」仍标出来。
+       这样「动的时候会动」和「信息不丢」两头都占住。 */
     systems.forEach(function (s, i) {
       var y = DOPE_RULER + i * DOPE_ROW;
       if (i === current) { ctx.fillStyle = '#161b25'; ctx.fillRect(0, y, w, DOPE_ROW); }
@@ -14195,43 +14223,39 @@ window.addEventListener('unhandledrejection', function (event) {
       var f2 = Math.min(n, dopeFramesOf(s));
       var col = dopeColor(i);
       var by = y + 6, bh2 = DOPE_ROW - 12;
-      var bx = fx(f0), bwe = Math.max(3, fx(f1) - bx);
-      if (f2 > f1) {
-        ctx.globalAlpha = .32;
-        ctx.fillStyle = col;
-        dopeRoundRect(ctx, fx(f1), by, Math.max(1, fx(f2) - fx(f1)), bh2, 3);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
+      var bx = fx(f0);
+      var spanEnd = Math.max(bx + 1, fx(f2));
+
+      /* 1) 粒子存活窗口的参考细线（底部 2px） */
+      ctx.save();
+      ctx.globalAlpha = .35;
       ctx.fillStyle = col;
-      dopeRoundRect(ctx, bx, by, bwe, bh2, 3);
-      ctx.fill();
-      /* 已播放进度（2026-11-14 第五十轮，用户第三次报「进度条卡住」）。
-         上面那条实心色块画的是**发射区间** —— 由发射起止决定，跟播放到哪儿
-         毫无关系，所以整段播放下来一动不动。用户看到的「不会动的进度条」
-         就是它，他答的「滑块头不动」也是这个意思。
-         这里再叠一层「区间起点 → 播放头」的提亮，让它真的能看出播放进度。
-         用 lighter 混合而不是盖一层半透明色块：实心段和淡色尾巴段的底色不同，
-         盖色块会把两者压成同一个色调，分不出「发射中」和「只剩尾巴」了；
-         lighter 是在原色上做加法，两段的明暗差保留，同时都能看出走到哪儿。 */
+      ctx.fillRect(bx, y + DOPE_ROW - 4, spanEnd - bx, 2);
+      /* 发射结束的短刻度：1px 竖线，比色块克制得多，不会被当成进度条 */
+      var ex = Math.round(fx(f1)) + .5;
+      ctx.globalAlpha = .55;
+      ctx.fillRect(ex, y + 3, 1, DOPE_ROW - 8);
+      ctx.restore();
+
+      /* 2) 播放进度：从窗口起点填到播放头。这就是「会动的那条」。 */
       var headF = clamp(time, 0, duration()) * SPINE_FPS;
-      if (headF > f0 && f2 > f0) {
-        var pw = Math.min(fx(headF), fx(f2)) - bx;
-        if (pw > 0.5) {
-          ctx.save();
-          dopeRoundRect(ctx, bx, by, Math.max(1, fx(f2) - bx), bh2, 3);
-          ctx.clip();
-          ctx.globalCompositeOperation = 'lighter';
-          ctx.fillStyle = col;
-          ctx.globalAlpha = 0.34;
-          ctx.fillRect(bx, by, pw, bh2);
-          ctx.restore();
-        }
+      var headX = Math.min(fx(headF), spanEnd);
+      if (headX > bx + .5) {
+        ctx.save();
+        dopeRoundRect(ctx, bx, by, spanEnd - bx, bh2, 3);
+        ctx.clip();
+        ctx.fillStyle = col;
+        ctx.fillRect(bx, by, headX - bx, bh2);
+        ctx.restore();
       }
+      /* 3) 当前系统：给整段窗口描一圈淡边，选中态看得出来但不抢进度条 */
       if (i === current) {
-        ctx.strokeStyle = 'rgba(255,255,255,.5)';
-        dopeRoundRect(ctx, bx, by, bwe, bh2, 3);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,255,255,.22)';
+        ctx.lineWidth = 1;
+        dopeRoundRect(ctx, bx, by, spanEnd - bx, bh2, 3);
         ctx.stroke();
+        ctx.restore();
       }
     });
 
@@ -16100,7 +16124,9 @@ window.addEventListener('unhandledrejection', function (event) {
       fCheck('阻力', 'modifiers.drag.enabled', null, 'life.speed.on=false', { head: true }) +
       fNum('强度', 'modifiers.drag.strength', { step: 0.1, min: 0, when: 'modifiers.drag.enabled=true', ariaName: '阻力强度' }) +
       fCheck('噪波', 'modifiers.noise.enabled', null, null, { head: true }) +
-      fNum('强度', 'modifiers.noise.strength', { step: 5, when: 'modifiers.noise.enabled=true', ariaName: '噪波强度' }) +
+      /* 噪波强度（2026-11-14 第五十二轮，用户要求「噪波强度支持随机」）：
+         改成和重力 / 风同一套「值 + ▾ 切固定随机」。 */
+      fModeRow('强度', 'modifiers.noise.strengthMode', 'modifiers.noise.strengthMin', 'modifiers.noise.strengthMax', { step: 5, fixedPath: 'modifiers.noise.strength', when: 'modifiers.noise.enabled=true', ariaName: '噪波强度' }) +
       fNum('范围', 'modifiers.noise.scale', { step: 5, min: 1, when: 'modifiers.noise.enabled=true', ariaName: '噪波范围' }) +
       fNum('流速', 'modifiers.noise.speed', { step: 0.1, when: 'modifiers.noise.enabled=true', ariaName: '噪波流速' });
 
@@ -19372,15 +19398,10 @@ window.addEventListener('unhandledrejection', function (event) {
     /* 录制 MP4（2026-11-13）。取消是自愿的：录到一半点取消就把这一轮丢掉，
        不落文件 —— 半截视频比没有更让人困惑。 */
     if (dom.recordMp4) dom.recordMp4.addEventListener('click', function () { recordMp4(); });
-    /* 「录进视频」这颗勾选：用户手动动过一次就打上标记 ——
-       syncRecControls 只在「用户没表达过意见」时才默认勾上，
-       否则每次导入背景都会把用户特意关掉的勾重新打开。 */
-    if (dom.recBg) dom.recBg.addEventListener('change', function () {
-      dom.recBg.dataset.touched = '1';
-    });
-    /* 分辨率下拉：选了「跟随背景图」而在没有背景图时录制，会退到 512 —— 这属于
-       用户明确选择，不用额外提示。这里只负责把提示行刷新一下。 */
-    if (dom.recSize) dom.recSize.addEventListener('change', syncRecControls);
+    /* 分辨率两个数字框（第五十一轮）：用户手动改过一次就打 touched 标记 ——
+       syncRecControls 只在「用户没表达过意见」时才用背景图尺寸覆盖它。 */
+    if (dom.recW) dom.recW.addEventListener('input', function () { dom.recW.dataset.touched = '1'; });
+    if (dom.recH) dom.recH.addEventListener('input', function () { dom.recH.dataset.touched = '1'; });
     syncRecControls();
     var recCancelBtn = document.getElementById('pt-rec-cancel');
     if (recCancelBtn) recCancelBtn.addEventListener('click', function () {
@@ -19619,9 +19640,8 @@ window.addEventListener('unhandledrejection', function (event) {
     dom.exportProject = $('pt-export-project');
     dom.importProject = $('pt-import-project');
     dom.projectInput = $('pt-project-input');
-    dom.recSize = $('pt-rec-size');
-    dom.recBg = $('pt-rec-bg');
-    dom.recHint = $('pt-rec-hint');
+    dom.recW = $('pt-rec-w');
+    dom.recH = $('pt-rec-h');
     dom.recordMp4 = $('pt-record-mp4');
     dom.animList = $('pt-anim-list');
     dom.animHint = $('pt-anim-hint');
@@ -19771,11 +19791,10 @@ window.addEventListener('unhandledrejection', function (event) {
   /* 画面是干净的特效本体：不画网格、不画背景参考图、不画发射器手柄。      */
   /* ------------------------------------------------------------------ */
 
-  /* 录制分辨率。世界是 BASE_WORLD(512) 见方，没有背景图时录成正方形最不容易变形；
-     H.264 要求宽高都是偶数，512 天然满足。
-     2026-11-14 第五十轮用户要求「录制分辨率要和导入的背景一样（背景 1920×1080
-     就录 1920×1080）」，所以有背景图时以背景图为准，见 recTargetSize()。 */
-  var REC_SIZES = [512, 768, 1024];
+  /* 录制分辨率。世界是 BASE_WORLD(512) 见方，没有背景图时默认录成正方形
+     最不容易变形；H.264 要求宽高都是偶数，512 天然满足。
+     第五十一轮起尺寸由「分辨率」那两个数字框给（见 recTargetSize），
+     导入背景时自动填背景尺寸，也可以手动改。 */
   var REC_FPS = 30;               /* 和 SPINE_FPS 一致，录出来能直接和导出动画对帧 */
   var recBusy = false;
 
@@ -19790,23 +19809,16 @@ window.addEventListener('unhandledrejection', function (event) {
     return n % 2 === 0 ? n : n + 1;
   }
 
-  /* 这次要录多大。有背景图就用背景图的原尺寸 —— 见 recTargetSize 上面那段说明。 */
+  /* 这次要录多大。
+     第五十一轮用户要求「导入背景后默认跟随背景图但也支持修改（增加可手动输入）」，
+     所以改成两个数字框：导入背景时自动填背景图宽高（用户没手动改过的话），
+     用户改了就一直用他填的。没有背景图时用框里的值（默认 512×512）。 */
   function recTargetSize() {
-    var img = bgLayer.img;
-    var nw = img ? (img.naturalWidth || img.width || 0) : 0;
-    var nh = img ? (img.naturalHeight || img.height || 0) : 0;
-    if (nw > 0 && nh > 0) {
-      return { w: recEven(nw), h: recEven(nh), from: 'bg', nw: nw, nh: nh };
-    }
-    var v = dom.recSize ? String(dom.recSize.value || '') : '512';
-    if (v === 'auto') v = '512';
-    if (v.indexOf('x') > 0) {
-      var parts = v.split('x');
-      return { w: recEven(parts[0]), h: recEven(parts[1]), from: 'preset' };
-    }
-    var s = Number(v);
-    if (REC_SIZES.indexOf(s) < 0) s = 512;
-    return { w: s, h: s, from: 'preset' };
+    var w = dom.recW ? Number(dom.recW.value) : 0;
+    var h = dom.recH ? Number(dom.recH.value) : 0;
+    if (!(w > 0)) w = 512;
+    if (!(h > 0)) h = 512;
+    return { w: recEven(w), h: recEven(h) };
   }
 
   /* 背景图在录制里怎么放。
@@ -19814,41 +19826,26 @@ window.addEventListener('unhandledrejection', function (event) {
      所以想让底图**正好铺满**整帧，zoom 必须是 W / 图宽（= H / 图高，因为 W/H 就是按它
      的宽高比来的；万一两者对不上，取较大的那个，宁可裁掉一点也不要留黑边）。
      这就是录制的取景缩放，和用户在画布里滚了多少滚轮无关。 */
-  function recFraming(w, h, size) {
-    if (!size || size.nw <= 0 || size.nh <= 0) return Math.min(w, h) / BASE_WORLD * 0.9;
-    return Math.max(w / size.nw, h / size.nh);
+  function recFraming(w, h) {
+    var img = bgLayer.img;
+    var nw = img ? (img.naturalWidth || img.width || 0) : 0;
+    var nh = img ? (img.naturalHeight || img.height || 0) : 0;
+    if (nw > 0 && nh > 0) return Math.max(w / nw, h / nh);
+    return Math.min(w, h) / BASE_WORLD * 0.9;
   }
 
-  /* 录制组那两行控件的状态（2026-11-14）。
-     有背景图时分辨率是**钉死**的（用户要求「录制分辨率要和导入的背景一样」），
-     所以把下拉置灰、显示「跟随背景图」并把实际尺寸写在下面那行提示里 ——
-     光置灰不说明原因，用户会以为界面坏了。 */
+  /* 分辨率框的状态（2026-11-14 第五十一轮）。
+     导入背景时把框填成背景图尺寸 —— 但只在用户没手动改过的时候填，
+     否则用户特意填的 1280×720 会被下一次导入背景覆盖掉。 */
   function syncRecControls() {
-    if (!dom.recSize) return;
+    if (!dom.recW || !dom.recH) return;
+    if (dom.recW.dataset.touched) return;
     var img = bgLayer.img;
-    var hasBg = !!(img && (img.naturalWidth || img.width));
-    if (hasBg) {
-      dom.recSize.value = 'auto';
-      dom.recSize.disabled = true;
-    } else {
-      dom.recSize.disabled = false;
-      if (dom.recSize.value === 'auto') dom.recSize.value = '512';
-    }
-    if (dom.recBg) {
-      dom.recBg.disabled = !hasBg;
-      if (!hasBg) dom.recBg.checked = false;
-      else if (!dom.recBg.dataset.touched) dom.recBg.checked = true;
-    }
-    if (dom.recHint) {
-      var t = recTargetSize();
-      if (hasBg) {
-        dom.recHint.textContent = '分辨率跟随背景图：' + t.w + ' × ' + t.h +
-          (bgLayer.name ? '（' + bgLayer.name + '）' : '');
-        dom.recHint.className = 'pt-rec-hint is-on';
-      } else {
-        dom.recHint.textContent = '没有导入背景图，按左边选的尺寸录制';
-        dom.recHint.className = 'pt-rec-hint';
-      }
+    var nw = img ? (img.naturalWidth || img.width || 0) : 0;
+    var nh = img ? (img.naturalHeight || img.height || 0) : 0;
+    if (nw > 0 && nh > 0) {
+      dom.recW.value = String(recEven(nw));
+      dom.recH.value = String(recEven(nh));
     }
   }
 
@@ -19908,12 +19905,12 @@ window.addEventListener('unhandledrejection', function (event) {
       status('这个浏览器不支持 WebCodecs 录制（需要 Chrome / Edge 且支持 H.264 编码）', 9000, true);
       return;
     }
-    /* 这次的尺寸 / 是否录背景（2026-11-14 第五十轮）：
-       - 有背景图 → 分辨率**强制**跟背景图一样（用户要求），并默认把背景录进去；
-       - 没背景图 → 按「分辨率」下拉，且没有背景可录。
-       注意：勾选框只管「录不录背景」，改不了分辨率 —— 用户明确要求两者一致。 */
+    /* 这次的尺寸 / 是否录背景（2026-11-14）：
+       - 尺寸来自「分辨率」那两个数字框；导入背景时会自动填成背景尺寸，
+         用户也可以手动改成别的（第五十一轮用户要求）。
+       - 背景：只要导入了就录（第五十一轮用户要求删掉勾选，「默认就是录上」）。 */
     var size = recTargetSize();
-    var withBg = !!(bgLayer.img && dom.recBg && dom.recBg.checked);
+    var withBg = !!(bgLayer.img && bgLayer.show);
 
     var savedTime = time;
     var wasPlaying = playing;
@@ -19970,7 +19967,7 @@ window.addEventListener('unhandledrejection', function (event) {
 
       /* 取景缩放：录背景时按「画面宽 / 图宽」算，让底图正好铺满整帧；
          不录背景时用世界尺寸那套（0.9 留边）—— 两种都和用户的缩放无关。 */
-      var recZoom = withBg ? recFraming(size.w, size.h, size) : null;
+      var recZoom = withBg ? recFraming(size.w, size.h) : null;
 
       /* 逐帧：t = f / REC_FPS，先 seek 到位再渲染。
          seek 会走 stepTo → advanceTo，和播放 / 导出同一条路。 */
@@ -20049,7 +20046,7 @@ window.addEventListener('unhandledrejection', function (event) {
   }
 
   window.__particleEditor = {
-    version: '1.3',
+    version: '1.4',
     enter: enter,
     leave: leave,
     getState: function () {
